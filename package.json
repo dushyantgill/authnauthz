@@ -1,1 +1,43 @@
-{"name":"authnauthz","version":"0.1.0","private":true,"scripts":{"dev":"next dev","build":"next build","start":"next start"},"dependencies":{"@vercel/blob":"latest","jose":"latest","next":"15.5.4","papaparse":"latest","react":"19.1.0","react-dom":"19.1.0"},"devDependencies":{"@types/node":"latest","@types/papaparse":"latest","@types/react":"latest","@types/react-dom":"latest","typescript":"latest"}}
+{
+  "name": "authnauthz",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "setup": "tsx scripts/setup.ts",
+    "test:blob": "tsx scripts/test-blob.ts",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@authenio/samlify-node-xmllint": "2.0.0",
+    "@vercel/blob": "2.8.1",
+    "@xmldom/xmldom": "0.9.12",
+    "jose": "6.2.12",
+    "next": "16.4.0",
+    "oidc-provider": "9.12.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "samlify": "2.13.1",
+    "scim2-parse-filter": "0.3.0",
+    "xml-crypto": "6.3.3",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "@types/oidc-provider": "9.12.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "prettier": "3.9.9",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
