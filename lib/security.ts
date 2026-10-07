@@ -127,10 +127,25 @@ export async function verifyCsrf(t: string, token: string, purpose: string) {
     delete s.models[k];
   });
 }
+export async function loginAccount(
+  t: string,
+  input: { username?: string; accountId?: string },
+) {
+  const state = await store().read(t);
+  if (typeof input.username === "string") {
+    const username = input.username.trim().toLowerCase();
+    return state.resources.Users.find(
+      (u) => u.active && u.userName.toLowerCase() === username,
+    )?.id;
+  }
+  return state.resources.Users.find((u) => u.active && u.id === input.accountId)
+    ?.id;
+}
 export async function passwordOK(t: string, id: string, password: string) {
   const state = await store().read(t);
   if (!state.resources.Users.some((u) => u.id === id && u.active)) return false;
-  const record = JSON.parse(required("SIMULATION_PASSWORD_HASH"));
+  const record =
+    state.sharedCredential || JSON.parse(required("SIMULATION_PASSWORD_HASH"));
   const hash = scryptSync(password, record.salt, 32).toString("hex");
   return equal(hash, record.hash);
 }

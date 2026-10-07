@@ -13,6 +13,7 @@ export type Resource = Record<string, any>;
 type Entry = { payload: Resource; expires: number };
 export interface State {
   version: number;
+  sharedCredential?: { salt: string; hash: string };
   config: TenantConfig;
   resources: { Users: Resource[]; Groups: Resource[] };
   models: Record<string, Entry>;
@@ -118,7 +119,7 @@ export class BlobBackend implements Backend {
         allowOverwrite: !!etag,
         ...(etag ? { ifMatch: etag } : {}),
         contentType: "application/json",
-        cacheControlMaxAge: 0,
+        cacheControlMaxAge: 60,
       });
     } catch (e) {
       if (e instanceof BlobPreconditionFailedError)

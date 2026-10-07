@@ -1,21 +1,27 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
+import { ProtocolSettings } from "../components/ProtocolSettings";
 import baseline from "../data/summit-ridge.json";
 type RecordData = Record<string, any>;
-const sections = [
-  "Overview",
-  "Directory",
-  "Groups",
-  "Organization",
-  "Account domains",
-  "Applications",
-  "Protocol endpoints",
-  "Activity",
+const sections = ["Overview", "Directory", "Configuration", "Activity"];
+const configurationTabs = [
+  "Domains",
+  "OIDC",
+  "SAML",
+  "WS-Fed",
+  "SCIM",
+  "Deployment",
+  "Advanced",
 ];
 export default function Home() {
   const [section, setSection] = useState("Overview"),
+    [overviewTab, setOverviewTab] = useState("Summary"),
+    [directoryTab, setDirectoryTab] = useState("Users"),
+    [configurationTab, setConfigurationTab] = useState("Domains"),
+    [deployment, setDeployment] = useState<RecordData | null>(null),
     [token, setToken] = useState(""),
     [connected, setConnected] = useState(false),
+    [simulationPassword, setSimulationPassword] = useState(""),
     [employeeDomain, setEmployeeDomain] = useState("summitridge.example"),
     [contractorDomain, setContractorDomain] = useState("summitridge.example"),
     [directory, setDirectory] = useState<RecordData | null>(null),
@@ -51,20 +57,24 @@ export default function Home() {
       );
     return b;
   }
+  async function loadState() {
+    const [d, c, status] = await Promise.all([
+      request("/api/admin/directory"),
+      request("/api/admin/config"),
+      request("/api/admin/status"),
+    ]);
+    setDirectory(d);
+    setEmployeeDomain(c.accountDomains?.employee || "summitridge.example");
+    setContractorDomain(c.accountDomains?.contractor || "summitridge.example");
+    setConfig(JSON.stringify(c, null, 2));
+    setDeployment(status);
+    setConnected(true);
+    return c;
+  }
   async function connect() {
     setBusy(true);
     try {
-      const [d, c] = await Promise.all([
-        request("/api/admin/directory"),
-        request("/api/admin/config"),
-      ]);
-      setDirectory(d);
-      setEmployeeDomain(c.accountDomains?.employee || "summitridge.example");
-      setContractorDomain(
-        c.accountDomains?.contractor || "summitridge.example",
-      );
-      setConfig(JSON.stringify(c, null, 2));
-      setConnected(true);
+      await loadState();
       setMessage("Connected to live simulator state.");
     } catch (e) {
       setMessage((e as Error).message);
@@ -75,17 +85,25 @@ export default function Home() {
   async function saveDomains(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
+    const expected = {
+      employee: employeeDomain.trim().toLowerCase(),
+      contractor: contractorDomain.trim().toLowerCase(),
+    };
     try {
       await request("/api/admin/domains", {
         method: "PUT",
-        body: JSON.stringify({
-          employee: employeeDomain,
-          contractor: contractorDomain,
-        }),
+        body: JSON.stringify(expected),
       });
-      await connect();
+      const saved = await loadState();
+      if (
+        saved.accountDomains.employee !== expected.employee ||
+        saved.accountDomains.contractor !== expected.contractor
+      )
+        throw Error(
+          "The server did not return the saved domains. Please refresh and try again.",
+        );
       setMessage(
-        "Account domains saved. Usernames and work emails have been updated.",
+        "Account domains saved and verified. Usernames and work emails have been updated.",
       );
     } catch (e) {
       setMessage((e as Error).message);
@@ -93,17 +111,37 @@ export default function Home() {
       setBusy(false);
     }
   }
+  async function savePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await request("/api/admin/password", {
+        method: "PUT",
+        body: JSON.stringify({ password: simulationPassword }),
+      });
+      setSimulationPassword("");
+      await loadState();
+      setMessage(
+        "Simulator password saved. Existing sessions and tokens have been revoked.",
+      );
+    } catch (e) {
+      setMessage((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveConfiguration(next: RecordData) {
+    await request("/api/admin/config", {
+      method: "PUT",
+      body: JSON.stringify(next),
+    });
+    await loadState();
+    setMessage("Configuration saved and refreshed.");
+  }
   async function save() {
     setBusy(true);
     try {
-      await request("/api/admin/config", {
-        method: "PUT",
-        body: JSON.stringify(JSON.parse(config)),
-      });
-      await connect();
-      setMessage(
-        "Configuration saved. New requests use these application registrations.",
-      );
+      await saveConfiguration(JSON.parse(config));
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -140,14 +178,27 @@ export default function Home() {
   return (
     <div className="shell">
       <aside>
-        <a className="brand" href="/">
-          a<span>AuthNAuthZ</span>
+        <a className="brand" href="/" aria-label="AuthNAuthZ home">
+          <svg className="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+            <path
+              d="M8 14h20v15h20v20h12M8 50h20V35h20V15h12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="6"
+              strokeLinejoin="round"
+            />
+            <circle cx="8" cy="14" r="5" fill="currentColor" />
+            <circle cx="8" cy="50" r="5" fill="currentColor" />
+          </svg>
+          <span>
+            AuthN<b>AuthZ</b>
+          </span>
         </a>
         <div className="tenant">
-          <span className="avatar">SR</span>
+          <span className="avatar">RE</span>
           <div>
-            <strong>Summit Ridge</strong>
-            <small>Properties · Real Estate</small>
+            <strong>Real Estate</strong>
+            <small>Enterprise archetype</small>
           </div>
           <span className="dot" />
         </div>
@@ -159,7 +210,7 @@ export default function Home() {
               onClick={() => setSection(s)}
               className={section === s ? "active" : ""}
             >
-              <span>{["◈", "♙", "⊞", "⑂", "▣", "⌘", "◷"][i]}</span>
+              <span>{["◈", "♙", "⌘", "◷"][i]}</span>
               {s}
             </button>
           ))}
@@ -186,7 +237,7 @@ export default function Home() {
         <div className="content">
           <div className="heading">
             <div>
-              <div className="eyebrow">SUMMIT RIDGE PROPERTIES</div>
+              <div className="eyebrow">REAL ESTATE</div>
               <h1>
                 {section === "Overview"
                   ? "Your enterprise, connected."
@@ -249,6 +300,74 @@ export default function Home() {
             </div>
           )}
           {section === "Overview" && (
+            <div className="tabs" role="tablist" aria-label="Overview views">
+              {["Summary", "Organization"].map((t) => (
+                <button
+                  role="tab"
+                  aria-selected={overviewTab === t}
+                  className={overviewTab === t ? "active" : "secondary"}
+                  key={t}
+                  onClick={() => setOverviewTab(t)}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
+          {section === "Directory" && (
+            <div className="tabs" role="tablist" aria-label="Directory views">
+              {["Users", "Groups"].map((t) => (
+                <button
+                  role="tab"
+                  aria-selected={directoryTab === t}
+                  className={directoryTab === t ? "active" : "secondary"}
+                  key={t}
+                  onClick={() => {
+                    setDirectoryTab(t);
+                    setQuery("");
+                    setSelected(null);
+                  }}
+                >
+                  {t} ({t === "Users" ? users.length : groups.length})
+                </button>
+              ))}
+            </div>
+          )}
+          {section === "Configuration" && (
+            <div
+              className="tabs"
+              role="tablist"
+              aria-label="Configuration views"
+            >
+              {configurationTabs.map((t) => (
+                <button
+                  role="tab"
+                  aria-selected={configurationTab === t}
+                  className={configurationTab === t ? "active" : "secondary"}
+                  key={t}
+                  onClick={() => setConfigurationTab(t)}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
+          {connected && deployment?.issues?.length > 0 && (
+            <div className="note">
+              <strong>Deployment needs attention</strong>
+              <p>{deployment?.issues.join(" ")}</p>
+              <button
+                className="secondary"
+                onClick={() => {
+                  setSection("Configuration");
+                  setConfigurationTab("Deployment");
+                }}
+              >
+                Review deployment settings
+              </button>
+            </div>
+          )}
+          {section === "Overview" && overviewTab === "Summary" && (
             <>
               <div className="stats">
                 {[
@@ -286,7 +405,7 @@ export default function Home() {
                     <h2>A company built around real work</h2>
                     <button
                       className="textbutton"
-                      onClick={() => setSection("Organization")}
+                      onClick={() => setOverviewTab("Organization")}
                     >
                       View organization →
                     </button>
@@ -336,7 +455,18 @@ export default function Home() {
                     <button
                       className="protocolrow"
                       key={name}
-                      onClick={() => setSection("Protocol endpoints")}
+                      onClick={() => {
+                        setSection("Configuration");
+                        setConfigurationTab(
+                          name === "SAML 2.0"
+                            ? "SAML"
+                            : name === "OpenID Connect"
+                              ? "OIDC"
+                              : name === "SCIM 2.0"
+                                ? "SCIM"
+                                : "WS-Fed",
+                        );
+                      }}
                     >
                       <div className="protocolicon">↗</div>
                       <div>
@@ -358,7 +488,7 @@ export default function Home() {
               </div>
             </>
           )}
-          {section === "Directory" && (
+          {section === "Directory" && directoryTab === "Users" && (
             <section className="card">
               <div className="toolbar">
                 <input
@@ -441,7 +571,7 @@ export default function Home() {
               </div>
             </section>
           )}
-          {section === "Groups" && (
+          {section === "Directory" && directoryTab === "Groups" && (
             <section className="card">
               <div className="toolbar">
                 <input
@@ -475,7 +605,7 @@ export default function Home() {
               </div>
             </section>
           )}
-          {section === "Organization" && (
+          {section === "Overview" && overviewTab === "Organization" && (
             <div className="orgcards">
               {baseline.organizations.map((o) => (
                 <section className="card" key={o.name}>
@@ -524,7 +654,7 @@ export default function Home() {
               ))}
             </div>
           )}
-          {section === "Account domains" && (
+          {section === "Configuration" && configurationTab === "Domains" && (
             <section className="card">
               <h2>Account domains</h2>
               <p>
@@ -572,7 +702,49 @@ export default function Home() {
               )}
             </section>
           )}
-          {section === "Applications" && (
+          {section === "Configuration" && configurationTab === "Domains" && (
+            <section className="card">
+              <h2>Simulated login password</h2>
+              <p>
+                All active simulated accounts use this shared test password. It
+                applies to OIDC, SAML, and WS-Fed login. Changing it revokes
+                existing sessions and tokens. The password is stored as a salted
+                hash in encrypted simulator state.
+              </p>
+              {connected ? (
+                <form className="domain-form" onSubmit={savePassword}>
+                  <p>
+                    Login password:{" "}
+                    {deployment?.simulationPasswordConfigured
+                      ? "Configured"
+                      : "Not configured"}
+                  </p>
+                  <label htmlFor="simulation-password">
+                    New shared test password
+                  </label>
+                  <input
+                    id="simulation-password"
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={10}
+                    maxLength={128}
+                    required
+                    value={simulationPassword}
+                    onChange={(e) => setSimulationPassword(e.target.value)}
+                  />
+                  <button disabled={busy}>
+                    {busy ? "Saving…" : "Set test password"}
+                  </button>
+                </form>
+              ) : (
+                <p>
+                  Connect with your admin token to set the shared login
+                  password.
+                </p>
+              )}
+            </section>
+          )}
+          {section === "Configuration" && configurationTab === "Advanced" && (
             <section className="card">
               <h2>Application registrations</h2>
               <p>
@@ -641,54 +813,28 @@ export default function Home() {
               )}
             </section>
           )}
-          {section === "Protocol endpoints" && (
-            <section className="card">
-              <h2>Connect your application</h2>
-              <p>
-                The tenant issuer and signing keys remain stable across
-                deployments. Copy endpoints using your deployment origin.
-              </p>
-              {[
-                ["OIDC issuer", "/api/t/realestate/oidc"],
-                [
-                  "OIDC discovery",
-                  "/api/t/realestate/oidc/.well-known/openid-configuration",
-                ],
-                ["Signing keys (JWKS)", "/api/t/realestate/oidc/jwks"],
-                ["SAML metadata", "/api/t/realestate/saml/metadata"],
-                ["SAML sign-in", "/api/t/realestate/saml/sso"],
-                ["SAML logout", "/api/t/realestate/saml/slo"],
-                ["SCIM base URL", "/api/t/realestate/scim"],
-                ["WS-Fed metadata", "/api/t/realestate/wsfed/metadata"],
-                ["WS-Fed passive sign-in", "/api/t/realestate/wsfed"],
-              ].map(([name, path]) => (
-                <div className="endpoint" key={name}>
-                  <strong>{name}</strong>
-                  <code>{path}</code>
-                  <button
-                    className="secondary"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(
-                          location.origin + path,
-                        );
-                        setMessage(`${name} copied.`);
-                      } catch {
-                        setMessage("Copy from the endpoint text.");
-                      }
-                    }}
-                  >
-                    Copy
-                  </button>
-                </div>
-              ))}
-              <div className="note">
-                SCIM requires the separate SCIM bearer token. OIDC uses
-                registered clients. Federation uses registered metadata and
-                realms. Credentials belong in the deployment environment.
-              </div>
-            </section>
-          )}
+          {section === "Configuration" &&
+            ["OIDC", "SAML", "WS-Fed", "SCIM", "Deployment"].includes(
+              configurationTab,
+            ) && (
+              <ProtocolSettings
+                protocol={configurationTab}
+                config={
+                  config
+                    ? (() => {
+                        try {
+                          return JSON.parse(config);
+                        } catch {
+                          return {};
+                        }
+                      })()
+                    : {}
+                }
+                connected={connected}
+                deployment={deployment}
+                onSave={saveConfiguration}
+              />
+            )}
           {section === "Activity" && (
             <section className="card">
               <h2>Recent activity</h2>
@@ -724,6 +870,7 @@ export default function Home() {
                 className="textbutton"
                 onClick={() => {
                   setConnected(false);
+                  setDeployment(null);
                   setToken("");
                   setDirectory(null);
                   setConfig("");

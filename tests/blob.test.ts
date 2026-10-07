@@ -29,7 +29,7 @@ beforeEach(() => {
     async (path: string, text: string, options: any) => {
       expect(options.access).toBe("private");
       expect(options.addRandomSuffix).toBe(false);
-      expect(options.cacheControlMaxAge).toBe(0);
+      expect(options.cacheControlMaxAge).toBe(60);
       const old = blob.files.get(path);
       if (old && (!options.ifMatch || old.etag !== options.ifMatch))
         throw new BlobPreconditionFailedError();

@@ -16,6 +16,7 @@ import {
   csrf,
   verifyCsrf,
   passwordOK,
+  loginAccount,
   setSession,
   clearSession,
   sameOrigin,
@@ -541,19 +542,10 @@ export async function federation(
         const token = await csrf(t, uid);
         res.setHeader(
           "Content-Security-Policy",
-          "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+          "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; form-action 'self'; frame-ancestors 'none'",
         );
         return res.send(
-          `<!doctype html><html><head><title>Summit Ridge sign in</title><style>body{font:16px system-ui;max-width:520px;margin:6% auto}input,select,button{display:block;width:100%;padding:12px;box-sizing:border-box;margin:18px 0}</style></head><body><h1>Summit Ridge Properties</h1><p>Sign in to ${escape(entry.payload.appName)} using a simulation identity.</p><form method="post"><input type="hidden" name="csrf" value="${token}"><label>Identity<select name="accountId">${state.resources.Users.filter(
-            (u) => u.active,
-          )
-            .map(
-              (u) =>
-                `<option value="${u.id}">${escape(u.displayName)} — ${escape(u.title)}</option>`,
-            )
-            .join(
-              "",
-            )}</select></label><label>Simulation password<input type="password" name="password" required></label><button>Sign in</button></form></body></html>`,
+          `<!doctype html><html><head><title>Real Estate sign in</title><style>@font-face{font-family:Plex;src:url(/fonts/ibm-plex-sans-regular.woff2) format("woff2");font-display:swap}body{font:16px Plex,system-ui;max-width:520px;margin:6% auto;color:#19231e;background:#f1f7eb}button{background:#a3e635;color:#19231e;border:0;border-radius:7px}input,select,button{display:block;width:100%;padding:12px;box-sizing:border-box;margin:18px 0}</style></head><body><h1>AuthNAuthZ · Real Estate</h1><p>Sign in to ${escape(entry.payload.appName)} using a simulation identity.</p><form method="post"><input type="hidden" name="csrf" value="${token}"><label>Username<input name="username" type="email" autocomplete="username" required placeholder="name@your-domain.com"></label><label>Simulation password<input type="password" name="password" required></label><button>Sign in</button></form></body></html>`,
         );
       }
       if (req.method !== "POST") return res.status(405).end();
@@ -564,9 +556,10 @@ export async function federation(
         t,
         String(req.headers["x-forwarded-for"] || req.socket.remoteAddress),
       );
-      if (!(await passwordOK(t, b.accountId, b.password)))
+      const accountId = await loginAccount(t, b);
+      if (!accountId || !(await passwordOK(t, accountId, b.password)))
         return res.status(401).send("Invalid credentials");
-      await setSession(res, b.accountId);
+      await setSession(res, accountId);
       const payload = await store().mutate(t, (s) => {
         const e = s.models["Federation:" + uid];
         if (!e) throw Error("Sign-in already completed");
@@ -576,7 +569,7 @@ export async function federation(
       return await finish(
         t,
         payload,
-        b.accountId,
+        accountId,
         Math.floor(Date.now() / 1000),
         res,
       );

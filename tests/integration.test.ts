@@ -136,7 +136,7 @@ it("supports discovery and a complete PKCE login, consent, userinfo, refresh, in
   const loginUrl = new URL(auth.headers.get("location")!, base).href;
   const login = await (await http(loginUrl, {}, true)).text();
   const csrf = login.match(/name="csrf" value="([^"]+)"/)?.[1],
-    account = login.match(/option value="([^"]+)"/)?.[1];
+    account = (await (await admin("directory")).json()).users[0].id;
   expect(csrf).toBeTruthy();
   let r = await http(
     loginUrl,
@@ -148,7 +148,9 @@ it("supports discovery and a complete PKCE login, consent, userinfo, refresh, in
       },
       body: new URLSearchParams({
         csrf: csrf!,
-        accountId: account!,
+        username: (await (await admin("directory")).json()).users.find(
+          (u: any) => u.id === account,
+        ).userName,
         password: readFileSync(".simulation-password", "utf8").trim(),
         action: "approve",
       }),
@@ -389,7 +391,7 @@ it("rejects invalid SAML requests, XML entities, replay and unregistered WS-Fed 
   const formUrl = new URL(r.headers.get("location")!, base).href;
   const login = await (await http(formUrl, {}, true)).text();
   const csrf = login.match(/name="csrf" value="([^"]+)"/)?.[1],
-    account = login.match(/option value="([^"]+)"/)?.[1];
+    account = (await (await admin("directory")).json()).users[0].id;
   const signed = await http(
     formUrl,
     {
@@ -400,7 +402,9 @@ it("rejects invalid SAML requests, XML entities, replay and unregistered WS-Fed 
       },
       body: new URLSearchParams({
         csrf: csrf!,
-        accountId: account!,
+        username: (await (await admin("directory")).json()).users.find(
+          (u: any) => u.id === account,
+        ).userName,
         password: readFileSync(".simulation-password", "utf8").trim(),
       }),
     },
@@ -487,4 +491,54 @@ it("rejects invalid SAML requests, XML entities, replay and unregistered WS-Fed 
   });
   expect(verified.extract.response).toBeTruthy();
   expect((await http(String(logout.context))).status).toBe(400);
+});
+it("persists domains, retains stable IDs, rejects cross-origin changes, and stores only a test-password hash", async () => {
+  const before = await (await admin("directory")).json();
+  const domains = {
+    employee: "officelore.example",
+    contractor: "partners.example",
+  };
+  expect((await admin("domains", "PUT", domains)).status).toBe(200);
+  const saved = await (await admin("config")).json();
+  expect(saved.accountDomains).toEqual(domains);
+  const after = await (await admin("directory")).json();
+  expect(after.users.map((u: any) => u.id)).toEqual(
+    before.users.map((u: any) => u.id),
+  );
+  expect(after.groups).toEqual(before.groups);
+  expect(
+    after.users
+      .filter((u: any) => u.userType === "Employee")
+      .every((u: any) => u.userName.endsWith("@officelore.example")),
+  ).toBe(true);
+  const rejected = await http("/api/admin/domains", {
+    method: "PUT",
+    headers: {
+      Authorization: "Bearer " + process.env.ADMIN_TOKEN,
+      "Content-Type": "application/json",
+      Origin: "https://untrusted.example",
+    },
+    body: JSON.stringify({
+      employee: "evil.example",
+      contractor: "evil.example",
+    }),
+  });
+  expect(rejected.status).toBe(403);
+  expect((await (await admin("config")).json()).accountDomains).toEqual(
+    domains,
+  );
+  expect(
+    (await admin("password", "PUT", { password: "Test@User1" })).status,
+  ).toBe(200);
+  const status = await (await admin("status")).json();
+  expect(status.simulationPasswordConfigured).toBe(true);
+  const configText = await (await admin("config")).text();
+  expect(configText).not.toContain("Test@User1");
+  expect(configText).not.toContain("sharedCredential");
+  expect(
+    (await admin("reset", "POST", { confirm: "RESET SUMMIT RIDGE" })).status,
+  ).toBe(200);
+  expect((await (await admin("directory")).json()).users[0].userName).toContain(
+    "@officelore.example",
+  );
 });

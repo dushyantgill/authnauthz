@@ -1,9 +1,10 @@
 :root {
-  --ink: #17342d;
-  --muted: #74827d;
-  --green: #1a5b46;
+  --ink: #19231e;
+  --accent: #a3e635;
+  --muted: #647168;
+  --green: #44651a;
   --line: #e3e9e5;
-  --bg: #f6f8f6;
+  --bg: #f6f8f4;
 }
 * {
   box-sizing: border-box;
@@ -11,8 +12,8 @@
 body {
   margin: 0;
   font:
-    14px/1.5 Arial,
-    Helvetica,
+    14px/1.5 "IBM Plex Sans",
+    system-ui,
     sans-serif;
   color: var(--ink);
   background: var(--bg);
@@ -28,8 +29,8 @@ button {
   border: 0;
   border-radius: 7px;
   padding: 10px 16px;
-  background: var(--green);
-  color: white;
+  background: var(--accent);
+  color: var(--ink);
   font-weight: 600;
 }
 button:disabled {
@@ -41,7 +42,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 tr:focus-visible {
-  outline: 3px solid #90c9aa;
+  outline: 3px solid #659a19;
   outline-offset: 3px;
 }
 a {
@@ -710,4 +711,112 @@ li {
 }
 .domain-form button {
   justify-self: start;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0;
+}
+.tabs button.active {
+  background: var(--ink, #152735);
+  color: white;
+}
+.configuration-grid {
+  display: grid;
+  gap: 20px;
+}
+.public-material {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #f3f6f8;
+  padding: 16px;
+  border-radius: 8px;
+  max-height: 260px;
+  overflow: auto;
+  font-size: 12px;
+}
+.fingerprint {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.domain-form label {
+  display: grid;
+  gap: 8px;
+}
+.domain-form input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+.endpoint {
+  flex-wrap: wrap;
+}
+.endpoint code {
+  overflow-wrap: anywhere;
+}
+
+/* Switch identity: high-contrast charcoal navigation and lime actions. */
+code,
+pre,
+textarea {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+aside {
+  background: var(--ink);
+  color: #f1f7eb;
+  border-color: var(--ink);
+}
+.brand {
+  gap: 9px;
+}
+.brand-mark {
+  width: 34px;
+  height: 34px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.brand b {
+  color: var(--accent);
+  font-weight: 700;
+}
+.tenant {
+  background: #253227;
+  border-color: #3a493a;
+}
+aside .avatar {
+  background: #35472b;
+  color: var(--accent);
+}
+.tenant small,
+.navlabel,
+.sidebarfoot,
+.sidebarfoot small {
+  color: #b8c7b1;
+}
+nav button {
+  color: #cbd6c5;
+}
+nav button:hover {
+  background: #2b3829;
+}
+nav .active,
+nav .active:hover {
+  background: var(--accent);
+  color: var(--ink);
+}
+.dot {
+  background: var(--accent);
+}
+.bar i {
+  background: #72993d;
+}
+button:not(.secondary):not(.textbutton):not(.protocolrow):not(.group):hover {
+  filter: brightness(0.96);
+}
+@media (max-width: 800px) {
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+  }
 }
