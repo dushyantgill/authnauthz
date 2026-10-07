@@ -33,7 +33,15 @@ export default function Home() {
         ...options.headers,
       },
     });
-    const b = await r.json();
+    const text = await r.text();
+    let b;
+    try {
+      b = JSON.parse(text);
+    } catch {
+      throw Error(
+        `The server returned an unexpected response (HTTP ${r.status}). Check the deployment configuration and Vercel logs.`,
+      );
+    }
     if (!r.ok)
       throw Error(
         typeof b.error === "string" ? b.error : JSON.stringify(b.error),
