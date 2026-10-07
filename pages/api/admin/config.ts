@@ -3,6 +3,7 @@ import { ConfigSchema } from "../../../lib/config";
 import { store } from "../../../lib/store";
 import { admin, headers, sameOrigin } from "../../../lib/security";
 import { validateMetadata } from "../../../lib/federation";
+import { applyAccountDomains } from "../../../lib/domains";
 export const config = { api: { bodyParser: { sizeLimit: "256kb" } } };
 export default async function handler(
   req: NextApiRequest,
@@ -32,7 +33,15 @@ export default async function handler(
         throw Error("SP encryption certificate required");
     }
     await store().mutate("realestate", (s) => {
-      s.config = parsed.data;
+      applyAccountDomains(
+        s,
+        req.body.accountDomains ||
+          s.config.accountDomains || {
+            employee: "summitridge.example",
+            contractor: "summitridge.example",
+          },
+      );
+      s.config = { ...parsed.data, accountDomains: s.config.accountDomains };
       s.events.unshift({
         at: new Date().toISOString(),
         type: "configuration.updated",

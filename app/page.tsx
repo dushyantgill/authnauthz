@@ -7,6 +7,7 @@ const sections = [
   "Directory",
   "Groups",
   "Organization",
+  "Account domains",
   "Applications",
   "Protocol endpoints",
   "Activity",
@@ -15,6 +16,8 @@ export default function Home() {
   const [section, setSection] = useState("Overview"),
     [token, setToken] = useState(""),
     [connected, setConnected] = useState(false),
+    [employeeDomain, setEmployeeDomain] = useState("summitridge.example"),
+    [contractorDomain, setContractorDomain] = useState("summitridge.example"),
     [directory, setDirectory] = useState<RecordData | null>(null),
     [config, setConfig] = useState(""),
     [query, setQuery] = useState(""),
@@ -56,9 +59,34 @@ export default function Home() {
         request("/api/admin/config"),
       ]);
       setDirectory(d);
+      setEmployeeDomain(c.accountDomains?.employee || "summitridge.example");
+      setContractorDomain(
+        c.accountDomains?.contractor || "summitridge.example",
+      );
       setConfig(JSON.stringify(c, null, 2));
       setConnected(true);
       setMessage("Connected to live simulator state.");
+    } catch (e) {
+      setMessage((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveDomains(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await request("/api/admin/domains", {
+        method: "PUT",
+        body: JSON.stringify({
+          employee: employeeDomain,
+          contractor: contractorDomain,
+        }),
+      });
+      await connect();
+      setMessage(
+        "Account domains saved. Usernames and work emails have been updated.",
+      );
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -72,6 +100,7 @@ export default function Home() {
         method: "PUT",
         body: JSON.stringify(JSON.parse(config)),
       });
+      await connect();
       setMessage(
         "Configuration saved. New requests use these application registrations.",
       );
@@ -494,6 +523,54 @@ export default function Home() {
                 </section>
               ))}
             </div>
+          )}
+          {section === "Account domains" && (
+            <section className="card">
+              <h2>Account domains</h2>
+              <p>
+                Set the domain suffix for employee and vendor/contractor
+                accounts. Saving updates existing usernames and work emails.
+                Identity IDs, reporting lines, and group memberships stay the
+                same.
+              </p>
+              {connected ? (
+                <form onSubmit={saveDomains} className="domain-form">
+                  <label htmlFor="employee-domain">Employee domain</label>
+                  <input
+                    id="employee-domain"
+                    value={employeeDomain}
+                    onChange={(e) => setEmployeeDomain(e.target.value)}
+                    placeholder="employees.example.com"
+                    required
+                    autoCapitalize="none"
+                    spellCheck={false}
+                  />
+                  <label htmlFor="contractor-domain">
+                    Vendor / contractor domain
+                  </label>
+                  <input
+                    id="contractor-domain"
+                    value={contractorDomain}
+                    onChange={(e) => setContractorDomain(e.target.value)}
+                    placeholder="partners.example.com"
+                    required
+                    autoCapitalize="none"
+                    spellCheck={false}
+                  />
+                  <p>
+                    Enter a domain only, without @ or https://. Accounts keep
+                    their current username prefix. Use the updated username when
+                    signing in; external applications may need their account
+                    mappings updated.
+                  </p>
+                  <button disabled={busy}>
+                    {busy ? "Saving…" : "Save account domains"}
+                  </button>
+                </form>
+              ) : (
+                <p>Connect with your admin token to change account domains.</p>
+              )}
+            </section>
           )}
           {section === "Applications" && (
             <section className="card">

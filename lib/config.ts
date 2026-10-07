@@ -9,8 +9,24 @@ const endpoint = z
       (!process.env.VERCEL && ["localhost", "127.0.0.1"].includes(u.hostname))
     );
   }, "HTTPS required");
+export const DomainSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(
+    /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/,
+    "Enter a domain such as example.com, without @ or a URL",
+  );
+export const AccountDomainsSchema = z.object({
+  employee: DomainSchema,
+  contractor: DomainSchema,
+});
 export const ConfigSchema = z
   .object({
+    accountDomains: AccountDomainsSchema.default({
+      employee: "summitridge.example",
+      contractor: "summitridge.example",
+    }),
     persona: z.enum(["generic", "entra", "okta", "adfs"]).default("generic"),
     clients: z
       .array(

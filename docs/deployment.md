@@ -76,3 +76,9 @@ An explicit baseline reset is available via `POST /api/admin/reset`, authenticat
 - **SCIM 409/412:** duplicate username or stale ETag. Read the current resource and retry the intended change.
 - **OIDC invalid_grant:** expired, reused, revoked, misdirected, or incorrectly bound credential. Reuse of authorization codes/refresh tokens revokes the associated grant family. Begin a new authorization flow.
 - **Local data disappears:** memory mode is intentionally ephemeral. Select private Blob mode to retain runtime changes.
+
+## Account domains
+
+After connecting the dashboard with `ADMIN_TOKEN`, open **Account domains**. Enter separate domain suffixes for employees and vendors/contractors (without `@` or a URL), then save. Existing usernames and work emails change atomically; IDs, hierarchy, and memberships remain unchanged. Domains persist in the encrypted Blob configuration and are retained when resetting the directory. The locked source dataset is unchanged. Update relying-party account mappings as needed and start a new sign-in to receive updated claims; previously issued tokens retain their original claims until expiry. SCIM clients explicitly choose usernames for newly provisioned accounts; saving domains reapplies the suffix to all current Employee/Contractor accounts.
+
+The admin token authorizes reads of live state and application registrations, configuration changes, and explicit directory resets. It is separate from a simulated user's login password and the provisioning token. The dashboard keeps it only in page memory; disconnecting or refreshing removes it from the dashboard.

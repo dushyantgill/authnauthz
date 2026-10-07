@@ -702,3 +702,12 @@ li {
     padding: 20px;
   }
 }
+
+.domain-form {
+  display: grid;
+  gap: 12px;
+  max-width: 640px;
+}
+.domain-form button {
+  justify-self: start;
+}

@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { store, initial } from "../../../lib/store";
 import { admin, headers, sameOrigin } from "../../../lib/security";
+import { applyAccountDomains } from "../../../lib/domains";
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -13,6 +14,8 @@ export default async function handler(
     return res.status(400).json({ error: "Confirmation text required" });
   await store().mutate("realestate", (s) => {
     s.resources = initial().resources;
+    if (s.config.accountDomains)
+      applyAccountDomains(s, s.config.accountDomains);
     s.models = {};
     s.events = [{ at: new Date().toISOString(), type: "directory.reset" }];
   });
