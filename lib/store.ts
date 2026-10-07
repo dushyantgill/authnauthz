@@ -1,3 +1,4 @@
+import { withTestClients } from "./test-clients";
 import {
   get,
   head,
@@ -12,6 +13,7 @@ import {
   createHash,
 } from "node:crypto";
 import seed from "../data/summit-ridge.json";
+import { seeds } from "./archetypes";
 import { ConfigSchema, type TenantConfig, required, tenantId } from "./config";
 export type User = (typeof seed.users)[number];
 export type Group = (typeof seed.groups)[number];
@@ -25,10 +27,19 @@ export interface State {
   models: Record<string, Entry>;
   events: { at: string; type: string; subject?: string }[];
 }
-export function initial(): State {
+export function initial(t = "realestate"): State {
+  const seed = seeds[tenantId(t)];
   return {
     version: 1,
-    config: ConfigSchema.parse({}),
+    config: ConfigSchema.parse({
+      accountDomains:
+        t === "realestate"
+          ? undefined
+          : {
+              employee: t + ".example",
+              contractor: "partners." + t + ".example",
+            },
+    }),
     resources: {
       Users: seed.users.map((u) => ({
         schemas: [
@@ -166,12 +177,15 @@ export class Store {
     return `authnauthz/v1/${tenantId(t)}/state.enc.json`;
   }
   async read(t: string) {
-    return (await this.backend.read(this.path(t)))?.state || initial();
+    const s = (await this.backend.read(this.path(t)))?.state || initial(t);
+    s.config = withTestClients(s.config, t);
+    return s;
   }
   async mutate<T>(t: string, fn: (s: State) => T): Promise<T> {
     for (let i = 0; i < 5; i++) {
       const old = await this.backend.read(this.path(t));
-      const s = old?.state || initial();
+      const s = old?.state || initial(t);
+      s.config = withTestClients(s.config, t);
       const now = Date.now();
       for (const [k, v] of Object.entries(s.models))
         if (v.expires < now) delete s.models[k];

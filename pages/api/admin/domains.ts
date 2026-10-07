@@ -1,3 +1,4 @@
+import { tenantId } from "../../../lib/config";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { store } from "../../../lib/store";
 import { admin, headers, sameOrigin } from "../../../lib/security";
@@ -8,6 +9,12 @@ export default async function handler(
   res: NextApiResponse,
 ) {
   headers(res);
+  let tenant: string;
+  try {
+    tenant = tenantId(String(req.query.tenant || "realestate"));
+  } catch {
+    return res.status(404).json({ error: "Unknown archetype" });
+  }
   try {
     if (!admin(req)) return res.status(401).json({ error: "unauthorized" });
     if (req.method !== "PUT")
@@ -19,7 +26,7 @@ export default async function handler(
       return res
         .status(400)
         .json({ error: "Enter valid domain suffixes without @ or a URL." });
-    await store().mutate("realestate", (s) => {
+    await store().mutate(tenant, (s) => {
       applyAccountDomains(s, parsed.data);
       s.events.unshift({
         at: new Date().toISOString(),
@@ -29,10 +36,8 @@ export default async function handler(
     });
     return res.json({ ok: true });
   } catch (e) {
-    return res
-      .status(400)
-      .json({
-        error: e instanceof Error ? e.message : "Unable to save domains",
-      });
+    return res.status(400).json({
+      error: e instanceof Error ? e.message : "Unable to save domains",
+    });
   }
 }

@@ -1,7 +1,8 @@
+import { archetypes } from "../../lib/archetypes";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createHmac, randomUUID } from "node:crypto";
 import * as saml from "samlify";
-import { origin, required } from "../../lib/config";
+import { origin, required, tenantId } from "../../lib/config";
 import { headers, equal, escape } from "../../lib/security";
 import { store } from "../../lib/store";
 import { body } from "../../lib/http";
@@ -14,7 +15,7 @@ import {
   testEntity,
 } from "../../lib/saml-test";
 export const config = { api: { bodyParser: false } };
-const cookie = "authnauthz_saml_test";
+
 function sign(value: string) {
   return createHmac("sha256", required("COOKIE_SECRET"))
     .update(value)
@@ -34,15 +35,18 @@ export default async function handler(
     "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; form-action 'self'; frame-ancestors 'none'",
   );
   try {
-    const state = await store().read("realestate");
-    const app = state.config.samlApps.find((a) => a.id === testAppId);
+    const t = tenantId(String(req.query.tenant || "realestate"));
+    const name = archetypes[t].name,
+      cookie = "authnauthz_saml_test_" + t;
+    const state = await store().read(t);
+    const app = state.config.samlApps.find((a) => a.id === t + "-saml-test");
     if (!app)
       return res
         .status(409)
         .send(
           page(
             "Test application not registered",
-            "<p>Register the Real Estate SAML Test service provider before starting.</p>",
+            "<p>The built-in test service provider is unavailable. Check server configuration.</p>",
           ),
         );
     if (req.method === "GET") {
@@ -54,16 +58,19 @@ export default async function handler(
         "Set-Cookie",
         `${cookie}=${payload}.${sign(payload)}; Path=/api/saml-test; HttpOnly; SameSite=Lax; Max-Age=600${origin().startsWith("https:") ? "; Secure" : ""}`,
       );
-      const xml = testRequest(id);
+      const xml = testRequest(id, t);
       return res.send(
         page(
-          "Real Estate SAML SSO test",
-          `<p>This starts a fresh sign-in to the Real Estate IdP and validates its signed SAML response. Use an active directory username and your shared simulator password.</p><form method="post" action="${escape(origin())}/api/t/realestate/saml/sso"><input type="hidden" name="SAMLRequest" value="${Buffer.from(xml).toString("base64")}"><input type="hidden" name="RelayState" value="realestate-saml-test"><button>Start SAML SSO →</button></form><details><summary>View the AuthnRequest XML</summary><pre>${escape(xml)}</pre></details><p>Each request expires after five minutes. Reload this page to start again. This dedicated test SP accepts unsigned authentication requests; returned assertions and responses must be signed.</p>`,
+          name + " SAML SSO test",
+          `<p>This starts a fresh sign-in to the ${escape(name)} IdP and validates its signed SAML response. Use an active directory username and your shared simulator password.</p><form method="post" action="${escape(origin())}/api/t/${t}/saml/sso"><input type="hidden" name="SAMLRequest" value="${Buffer.from(xml).toString("base64")}"><input type="hidden" name="RelayState" value="${t}-saml-test"><button>Start SAML SSO →</button></form><details><summary>View the AuthnRequest XML</summary><pre>${escape(xml)}</pre></details><p>Each request expires after five minutes. Reload this page to start again. This dedicated test SP accepts unsigned authentication requests; returned assertions and responses must be signed.</p>`,
         ),
       );
     }
     if (req.method !== "POST") return res.status(405).end();
-    const raw = req.cookies[cookie] || "",
+    const raw =
+        req.cookies[cookie] ||
+        (t === "realestate" ? req.cookies.authnauthz_saml_test : "") ||
+        "",
       separator = raw.lastIndexOf("."),
       payload = raw.slice(0, separator),
       signature = raw.slice(separator + 1);
@@ -79,7 +86,7 @@ export default async function handler(
       root = doc.documentElement!;
     if (
       root.localName !== "Response" ||
-      root.getAttribute("Destination") !== testAcs() ||
+      root.getAttribute("Destination") !== testAcs(t) ||
       root.getAttribute("InResponseTo") !== pending.id
     )
       throw Error("SAML response does not match this test request");
@@ -98,7 +105,7 @@ export default async function handler(
     if (
       !confirmation ||
       confirmation.getAttribute("InResponseTo") !== pending.id ||
-      confirmation.getAttribute("Recipient") !== testAcs() ||
+      confirmation.getAttribute("Recipient") !== testAcs(t) ||
       !Number.isFinite(
         Date.parse(confirmation.getAttribute("NotOnOrAfter") || ""),
       ) ||
@@ -111,13 +118,13 @@ export default async function handler(
         "Audience",
       )
       .item(0)?.textContent;
-    if (audience !== testEntity()) throw Error("Unexpected audience");
-    const parsed = await testSp().parseLoginResponse(
-      saml.IdentityProvider({ metadata: idp("realestate").getMetadata() }),
+    if (audience !== testEntity(t)) throw Error("Unexpected audience");
+    const parsed = await testSp(t).parseLoginResponse(
+      saml.IdentityProvider({ metadata: idp(t).getMetadata() }),
       "post",
       { body: { SAMLResponse: b.SAMLResponse } },
     );
-    await store().once("realestate", "saml-test:" + pending.id, 600);
+    await store().once(t, "saml-test:" + pending.id, 600);
     res.setHeader(
       "Set-Cookie",
       `${cookie}=; Path=/api/saml-test; HttpOnly; SameSite=Lax; Max-Age=0${origin().startsWith("https:") ? "; Secure" : ""}`,
@@ -125,7 +132,7 @@ export default async function handler(
     return res.send(
       page(
         "SAML SSO succeeded",
-        `<p>The response and assertion signatures, request correlation, recipient, and audience passed validation.</p><h2>Signed identity and attributes</h2><pre>${escape(JSON.stringify(parsed.extract, null, 2))}</pre><details><summary>View the SAML response XML</summary><pre>${escape(xml)}</pre></details><a class="button" href="/api/saml-test">Run another test</a>`,
+        `<p>The response and assertion signatures, request correlation, recipient, and audience passed validation.</p><h2>Signed identity and attributes</h2><pre>${escape(JSON.stringify(parsed.extract, null, 2))}</pre><details><summary>View the SAML response XML</summary><pre>${escape(xml)}</pre></details><a class="button" href="${escape(testAcs(t))}">Run another test</a>`,
       ),
     );
   } catch (e) {

@@ -1,3 +1,4 @@
+import { archetypeId } from "./archetypes";
 import { z } from "zod";
 const endpoint = z
   .string()
@@ -129,8 +130,7 @@ export function origin() {
   return u.origin;
 }
 export function tenantId(t: string) {
-  if (t !== "realestate") throw Error("Unknown tenant");
-  return t;
+  return archetypeId(t);
 }
 export function issuer(t = "realestate") {
   return `${origin()}/api/t/${tenantId(t)}/oidc`;

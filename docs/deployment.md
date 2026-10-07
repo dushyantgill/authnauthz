@@ -4,7 +4,7 @@
 
 Import `dushyantgill/authnauthz` in Vercel and select the Next.js preset. Set the root directory to the repository root and Node.js to 24.x. The default build command is `npm run build`. The project uses the Node runtime and retains the IncomingMessage interface required by the protocol libraries through Pages API routes; the dashboard uses the App Router.
 
-Create a **private** Vercel Blob store in the Storage tab and connect it to this project. A public store is not an acceptable substitute for protocol-state storage. Vercel supplies `BLOB_READ_WRITE_TOKEN`. One Blob store is enough for this tenant; no Postgres, KV, Redis, or marketplace DB service is required.
+Create a **private** Vercel Blob store in the Storage tab and connect it to this project. A public store is not an acceptable substitute for protocol-state storage. Vercel supplies `BLOB_READ_WRITE_TOKEN`. One Blob store is enough for all three archetypes; no Postgres, KV, Redis, or marketplace DB service is required.
 
 Use separate private stores and signing credentials for Production and Preview. Preview deployments must not operate on the production state blob. Use a stable deployment origin for each environment rather than automatically deriving issuers from request Host headers or arbitrary preview domains.
 
@@ -18,7 +18,7 @@ Run `npm ci` and `npm run setup` locally. Copy each generated value into Vercel'
 | `STORAGE_MODE`             | `blob` for every deployment; `memory` is allowed only in local non-production development        |
 | `BLOB_READ_WRITE_TOKEN`    | Credential for the connected **private** Blob store                                              |
 | `ADMIN_TOKEN`              | Random administrator bearer credential; entered into the dashboard, retained only in page memory |
-| `SCIM_TOKEN`               | Separate tenant-scoped provisioning bearer credential                                            |
+| `SCIM_TOKEN`               | Separate deployment-wide provisioning bearer credential for all three archetypes                                            |
 | `COOKIE_SECRET`            | Stable random HMAC/cookie signing secret; setup produces sufficient entropy                      |
 | `STATE_ENCRYPTION_KEY`     | Base64-encoded 32-byte AES-256-GCM key for persisted state                                       |
 | `SIMULATION_PASSWORD_HASH` | JSON `{ "salt": "...", "hash": "..." }`; scrypt hash of the random shared simulation password    |
@@ -28,7 +28,7 @@ Run `npm ci` and `npm run setup` locally. Copy each generated value into Vercel'
 
 The generated certificate lasts one year. Monitor its expiry and renew the certificate/trust configuration before expiry. Maintain key values across ordinary redeployments. Changing `APP_URL` changes protocol identity and requires reconfiguration of relying parties. Changing the state encryption key without migrating the state makes existing Blob data unreadable; the application fails closed rather than replacing it.
 
-Redeploy after setting environment variables. Connect the dashboard with your admin token. An empty registration list is expected on first use. The first successful mutation creates the encrypted tenant state from the baseline; reads of an absent blob return the baseline, while storage errors are surfaced rather than treated as an empty directory.
+Redeploy after setting environment variables. Connect the dashboard with your admin token. Built-in SAML and OIDC test registrations are available automatically; register additional relying parties in Configuration. The first successful mutation creates the encrypted tenant state from the baseline; reads of an absent blob return the baseline, while storage errors are surfaced rather than treated as an empty directory.
 
 ## 3. Register applications
 
@@ -90,3 +90,11 @@ The sidebar now uses Overview (Summary / Organization), Directory (Users / Group
 Domain save verifies the returned persisted configuration before reporting success. `APP_URL` must equal the canonical HTTPS browser origin in Production for mutation origin checks to pass. A readable seed directory does not prove that origin checks, encryption keys, or Blob writes are configured. Blob uploads use the supported 60-second minimum cache age; state reads explicitly bypass CDN caching with `useCache: false`.
 
 A shared simulation password can now be set in Configuration → Domains. Its salted scrypt hash is stored inside encrypted Blob state; the plaintext is neither returned by APIs nor recorded in activity. It overrides the initial `SIMULATION_PASSWORD_HASH` fallback. A change clears all protocol sessions/grants/tokens and requires a fresh login. This is a shared synthetic test credential, not per-user production password management. Account suffixes and this password are runtime settings and require no redeploy. `APP_URL`, the encryption key, cookies and protocol signing keys are infrastructure bootstrap settings.
+
+## Additional archetypes and test pages
+
+Select **Real Estate**, **Biotech / Life Sciences**, or **Insurance** in the dashboard sidebar. Connect once with the admin token; configuration, domain suffixes, password overrides and live directories follow the selected archetype. Each uses a separate encrypted object at `authnauthz/v1/<tenant>/state.enc.json` in the existing private Blob store. No new environment variables or stores are required. Existing Real Estate state is retained.
+
+All tenants use the deployment's existing default simulation password until an admin saves a per-archetype override in Configuration → Domains. The brand on OIDC, SAML and WS-Fed login and consent pages is the uppercased first label of that archetype's employee domain: `limekube.com` displays **LIMEKUBE**. Contractor domains affect contractor usernames independently.
+
+Protocol test links appear in Configuration → OIDC and Configuration → SAML. Direct links are `/api/oidc-test?tenant=realestate`, `/api/oidc-test?tenant=biotech`, `/api/oidc-test?tenant=insurance`, and the corresponding `/api/saml-test?tenant=...` pages. The original `/api/saml-test` URL continues to mean Real Estate. Built-in test client registrations are reserved and managed automatically; their same-origin callbacks track `APP_URL`. Other registrations remain editable.

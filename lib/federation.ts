@@ -1,3 +1,4 @@
+import { loginBrand } from "./login-brand";
 import * as saml from "samlify";
 import * as validator from "@authenio/samlify-node-xmllint";
 import { DOMParser } from "@xmldom/xmldom";
@@ -542,12 +543,13 @@ export async function federation(
       if (req.method === "GET") {
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         const token = await csrf(t, uid);
+        const brand = loginBrand(t, state);
         res.setHeader(
           "Content-Security-Policy",
           "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; form-action 'self'; frame-ancestors 'none'",
         );
         return res.send(
-          `<!doctype html><html><head><title>Real Estate sign in</title><style>@font-face{font-family:Plex;src:url(/fonts/ibm-plex-sans-regular.woff2) format("woff2");font-display:swap}body{font:16px Plex,system-ui;max-width:520px;margin:6% auto;color:#19231e;background:#f1f7eb}button{background:#a3e635;color:#19231e;border:0;border-radius:7px}input,select,button{display:block;width:100%;padding:12px;box-sizing:border-box;margin:18px 0}</style></head><body><h1>AuthNAuthZ · Real Estate</h1><p>Sign in to ${escape(entry.payload.appName)} using a simulation identity.</p><form method="post"><input type="hidden" name="csrf" value="${token}"><label>Username<input name="username" type="email" autocomplete="username" required placeholder="name@your-domain.com"></label><label>Simulation password<input type="password" name="password" required></label><button>Sign in</button></form></body></html>`,
+          `<!doctype html><html><head><title>${brand.title} sign in</title><style>@font-face{font-family:Plex;src:url(/fonts/ibm-plex-sans-regular.woff2) format("woff2");font-display:swap}body{font:16px Plex,system-ui;max-width:520px;margin:6% auto;color:#19231e;background:#f1f7eb}button{background:#a3e635;color:#19231e;border:0;border-radius:7px}input,select,button{display:block;width:100%;padding:12px;box-sizing:border-box;margin:18px 0}${brand.style}</style></head><body>${brand.header}<h1>Sign in</h1><p>Sign in to ${escape(entry.payload.appName)} using a simulation identity.</p><form method="post"><input type="hidden" name="csrf" value="${token}"><label>Username<input name="username" type="email" autocomplete="username" required placeholder="name@your-domain.com"></label><label>Simulation password<input type="password" name="password" required></label><button>Sign in</button></form></body></html>`,
         );
       }
       if (req.method !== "POST") return res.status(405).end();
@@ -561,7 +563,7 @@ export async function federation(
       const accountId = await loginAccount(t, b);
       if (!accountId || !(await passwordOK(t, accountId, b.password)))
         return res.status(401).send("Invalid credentials");
-      await setSession(res, accountId);
+      await setSession(res, accountId, t);
       const payload = await store().mutate(t, (s) => {
         const e = s.models["Federation:" + uid];
         if (!e) throw Error("Sign-in already completed");
@@ -629,7 +631,7 @@ export async function federation(
         relay: v.relay,
       };
       const session = await currentSession(req);
-      if (session && v.root.getAttribute("ForceAuthn") !== "true")
+      if (session?.tenant === t && v.root.getAttribute("ForceAuthn") !== "true")
         return await finish(t, payload, session.id, session.authTime, res);
       const uid = await pending(t, payload);
       return res.redirect(303, `/api/t/${t}/saml/login?uid=${uid}`);
@@ -673,7 +675,7 @@ export async function federation(
       if (fresh !== null && !/^\d+$/.test(fresh))
         throw Error("Invalid freshness");
       if (
-        session &&
+        session?.tenant === t &&
         (fresh === null ||
           (Number(fresh) > 0 &&
             Date.now() / 1000 - session.authTime < Number(fresh) * 60))

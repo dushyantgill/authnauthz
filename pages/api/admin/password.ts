@@ -1,3 +1,4 @@
+import { tenantId } from "../../../lib/config";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { randomBytes, scryptSync } from "node:crypto";
 import { admin, headers, sameOrigin } from "../../../lib/security";
@@ -7,6 +8,12 @@ export default async function handler(
   res: NextApiResponse,
 ) {
   headers(res);
+  let tenant: string;
+  try {
+    tenant = tenantId(String(req.query.tenant || "realestate"));
+  } catch {
+    return res.status(404).json({ error: "Unknown archetype" });
+  }
   try {
     if (!admin(req)) return res.status(401).json({ error: "unauthorized" });
     if (req.method !== "PUT")
@@ -24,7 +31,7 @@ export default async function handler(
         .json({ error: "Use a test password of 10–128 characters." });
     const salt = randomBytes(16).toString("hex"),
       hash = scryptSync(password, salt, 32).toString("hex");
-    await store().mutate("realestate", (s) => {
+    await store().mutate(tenant, (s) => {
       s.sharedCredential = { salt, hash };
       // Changing a shared login credential invalidates every existing protocol grant/session.
       s.models = {};
@@ -36,10 +43,8 @@ export default async function handler(
     });
     return res.json({ ok: true });
   } catch (e) {
-    return res
-      .status(400)
-      .json({
-        error: e instanceof Error ? e.message : "Unable to save password",
-      });
+    return res.status(400).json({
+      error: e instanceof Error ? e.message : "Unable to save password",
+    });
   }
 }

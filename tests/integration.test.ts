@@ -545,6 +545,7 @@ it("persists domains, retains stable IDs, rejects cross-origin changes, and stor
 it("runs the reusable SAML test through login and verified ACS, then rejects replay", async () => {
   const { testMetadata } = await import("../lib/saml-test");
   const c = await (await admin("config")).json();
+  c.samlApps = c.samlApps.filter((a: any) => a.id !== "realestate-saml-test");
   c.samlApps.push({
     id: "realestate-saml-test",
     name: "Real Estate SAML Test",
@@ -621,3 +622,202 @@ it("runs the reusable SAML test through login and verified ACS, then rejects rep
     ).status,
   ).toBe(400);
 });
+
+for (const tenant of ["realestate", "biotech", "insurance"]) {
+  it(`runs the browser OIDC/OAuth test with PKCE and verifies ${tenant} claims`, async () => {
+    expect(
+      (
+        await admin("password?tenant=" + tenant, "PUT", {
+          password: "Test@User1",
+        })
+      ).status,
+    ).toBe(200);
+    const directory = await (await admin("directory?tenant=" + tenant)).json();
+    const launch = await http("/api/oidc-test?tenant=" + tenant, {}, true);
+    expect(launch.headers.get("content-type")).toContain("text/html");
+    const html = await launch.text();
+    const url = html
+      .match(/href="([^"]+)"[^>]*>Start OIDC/)![1]
+      .replaceAll("&amp;", "&");
+    const bad = await http(
+      "/api/oidc-test?tenant=" + tenant + "&callback=1&state=wrong&code=fake",
+      {},
+      true,
+    );
+    expect(bad.status).toBe(400);
+    let result = await http(url, {}, true),
+      callback = "";
+    for (let i = 0; i < 15; i++) {
+      if (result.status >= 300 && result.status < 400) {
+        const target = new URL(result.headers.get("location")!, base).href;
+        if (target.includes("/api/oidc-test")) callback = target;
+        result = await http(target, {}, true);
+      } else {
+        const body = await result.clone().text();
+        if (body.includes("OIDC / OAuth sign-in succeeded")) break;
+        const csrf = body.match(/name="csrf" value="([^"]+)"/)?.[1];
+        expect(csrf, body).toBeTruthy();
+        expect(result.headers.get("content-type")).toContain("text/html");
+        expect(body).not.toContain("AuthNAuthZ");
+        const action = body
+          .match(/<form[^>]+action="([^"]+)"/)![1]
+          .replaceAll("&amp;", "&");
+        result = await http(
+          action,
+          {
+            method: "POST",
+            headers: {
+              Origin: base,
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              csrf: csrf!,
+              action: "approve",
+              username: directory.users[0].userName,
+              password: "Test@User1",
+            }),
+          },
+          true,
+        );
+      }
+    }
+    const body = await result.text();
+    expect(result.status, body).toBe(200);
+    expect(body).toContain("OIDC / OAuth sign-in succeeded");
+    expect(body).toContain(directory.users[0].id);
+    expect(body).toContain("/api/t/" + tenant + "/oidc");
+    expect(callback).toBeTruthy();
+    expect((await http(callback, {}, true)).status).toBe(400);
+  });
+}
+for (const tenant of ["biotech", "insurance"]) {
+  it(`serves tenant-isolated SCIM and signed SAML test for ${tenant}`, async () => {
+    const d = await (await admin("directory?tenant=" + tenant)).json();
+    const users = await http("/api/t/" + tenant + "/scim/Users", {
+      headers: { Authorization: "Bearer " + process.env.SCIM_TOKEN },
+    });
+    expect(users.status).toBe(200);
+    expect((await users.json()).totalResults).toBe(267);
+    expect(
+      (
+        await http(scim + "/Users/" + d.users[0].id, {
+          headers: { Authorization: "Bearer " + process.env.SCIM_TOKEN },
+        })
+      ).status,
+    ).toBe(404);
+    const launch = await (
+      await http("/api/saml-test?tenant=" + tenant, {}, true)
+    ).text();
+    const request = launch.match(/name="SAMLRequest" value="([^"]+)"/)![1];
+    const start = await http(
+      "/api/t/" + tenant + "/saml/sso",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ SAMLRequest: request }),
+      },
+      true,
+    );
+    expect(start.status, await start.clone().text()).toBe(303);
+    const login = new URL(start.headers.get("location")!, base).href;
+    const form = await (await http(login, {}, true)).text();
+    expect(form).toContain(tenant === "biotech" ? "BIOTECH" : "INSURANCE");
+    expect(form).not.toContain("AuthNAuthZ");
+    const csrf = form.match(/name="csrf" value="([^"]+)"/)![1];
+    const response = await http(
+      login,
+      {
+        method: "POST",
+        headers: {
+          Origin: base,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          csrf,
+          username: d.users[0].userName,
+          password: "Test@User1",
+        }),
+      },
+      true,
+    );
+    const xmlForm = await response.text();
+    const samlResponse = xmlForm.match(
+      /name="SAMLResponse" value="([^"]+)"/,
+    )![1];
+    const verified = await http(
+      "/api/saml-test?tenant=" + tenant,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ SAMLResponse: samlResponse }),
+      },
+      true,
+    );
+    const body = await verified.text();
+    expect(verified.status, body).toBe(200);
+    expect(body).toContain("SAML SSO succeeded");
+    expect(body).toContain(d.users[0].userName);
+  });
+}
+for (const tenant of ["biotech", "insurance"]) {
+  it(`brands WS-Fed login from ${tenant}'s domain and validates realm/reply routing`, async () => {
+    const c = await (await admin("config?tenant=" + tenant)).json();
+    c.accountDomains = {
+      employee: "limekube.com",
+      contractor: "partners.limekube.com",
+    };
+    c.wsfedApps = [
+      {
+        id: tenant + "-wsfed",
+        name: "Test relying party",
+        realm: base + "/" + tenant + "-rp",
+        replyUrl: base + "/wsfed-callback",
+        tokenType: "saml20",
+      },
+    ];
+    const saved = await admin("config?tenant=" + tenant, "PUT", c);
+    expect(saved.status, await saved.clone().text()).toBe(200);
+    const response = await http(
+      "/api/t/" +
+        tenant +
+        "/wsfed?" +
+        new URLSearchParams({
+          wa: "wsignin1.0",
+          wtrealm: c.wsfedApps[0].realm,
+          wfresh: "0",
+        }),
+      {},
+      true,
+    );
+    expect(response.status).toBe(307);
+    const login = new URL(response.headers.get("location")!, base).href;
+    const page = await (await http(login, {}, true)).text();
+    expect(page).toContain("LIMEKUBE");
+    expect(page).not.toContain("AuthNAuthZ");
+    const csrf = page.match(/name="csrf" value="([^"]+)"/)![1];
+    const d = await (await admin("directory?tenant=" + tenant)).json();
+    const signed = await http(
+      login,
+      {
+        method: "POST",
+        headers: {
+          Origin: base,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          csrf,
+          username: d.users[0].userName,
+          password: "Test@User1",
+        }),
+      },
+      true,
+    );
+    expect(signed.status).toBe(200);
+    expect(signed.headers.get("content-type")).toContain("text/html");
+    expect(await signed.text()).toContain('name="wresult"');
+    const discovery = await (
+      await http("/api/t/" + tenant + "/oidc/.well-known/openid-configuration")
+    ).json();
+    expect(discovery.issuer).toBe(base + "/api/t/" + tenant + "/oidc");
+  });
+}

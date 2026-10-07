@@ -820,3 +820,22 @@ button:not(.secondary):not(.textbutton):not(.protocolrow):not(.group):hover {
     height: 32px;
   }
 }
+
+.tenant select {
+  width: 100%;
+  max-width: 165px;
+  margin-top: 6px;
+  font-size: 12px;
+  padding: 5px;
+}
+
+.mobile-archetype {
+  display: none;
+}
+@media (max-width: 800px) {
+  .mobile-archetype {
+    display: block;
+    max-width: 160px;
+    font-size: 12px;
+  }
+}

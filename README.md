@@ -2,7 +2,7 @@
 
 A configurable enterprise identity simulator built with Next.js, real cryptographic federation flows, and **private Vercel Blob persistence only**. No database, Redis, paid storage add-on, or writable server filesystem is required in deployment.
 
-The initial organization is **Summit Ridge Properties**, a real estate investment, development, and property company: **267 identities, 238 employees, 29 embedded vendors, nine organizations, 185 groups, and one CEO root**. The directory includes Senior Counsel, Employment & Immigration. Immigration cases, visa categories, and survivor status have no IAM attributes or groups.
+Choose **Real Estate**, **Biotech / Life Sciences**, or **Insurance** in the sidebar. All three contain 267 synthetic identities (238 employees and 29 embedded vendors), with separate configuration and protocol state. The locked Real Estate model is **267 identities, 238 employees, 29 embedded vendors, nine organizations, 185 groups, and one CEO root**. The directory includes Senior Counsel, Employment & Immigration. Immigration cases, visa categories, and survivor status have no IAM attributes or groups.
 
 The application provides directory search, reporting relationships, organizational views, group memberships, application registration, protocol endpoint discovery, and recent activity. Its protocol engine uses `oidc-provider`, `samlify`, XML schema validation, and verified XML/JWT signatures. The implemented protocol profiles and exclusions are explicit in [the capability matrix](docs/protocols.md). This application has not independently obtained OpenID certification or undergone an external security audit.
 
@@ -24,7 +24,7 @@ For persistence during local development, set `STORAGE_MODE=blob` and provide a 
 
 Follow [deployment and configuration](docs/deployment.md). Import this repository as a Next.js project; its root is the repository root. Create one **private Vercel Blob store**, attach it to the project, set the generated environment values, change `APP_URL` to the deployment's stable HTTPS origin, and set `STORAGE_MODE=blob`. No DB is needed. Never deploy memory mode; deployment refuses it.
 
-Application registrations start empty. Register relying parties through **Applications** in the authenticated UI. [Examples](docs/config.example.json) show public/confidential OIDC clients and WS-Fed; add SAML SP metadata from your relying party. Redirects, ACS destinations, and WS-Fed reply URLs are registered explicitly. Production registrations require HTTPS.
+Built-in SAML and OIDC test registrations are provided automatically. Register your own relying parties through **Configuration** in the authenticated UI. [Examples](docs/config.example.json) show public/confidential OIDC clients and WS-Fed; add SAML SP metadata from your relying party. Redirects, ACS destinations, and WS-Fed reply URLs are registered explicitly. Production registrations require HTTPS.
 
 Hobby is intended for personal, non-commercial testing and has finite storage-operation allowances. A sign-in uses several Blob writes, so the free allowance is a test budget, not a promise of unlimited identity-provider traffic. [Vercel Blob pricing](https://vercel.com/docs/vercel-blob/usage-and-pricing) and [Hobby plan terms](https://vercel.com/docs/plans/hobby) describe current limits.
 
@@ -48,3 +48,9 @@ After configuring a real private Blob store, run `npm run test:blob` for a live 
 `python3 scripts/import-directory.py /path/to/SampleAADUserData.csv` deterministically recreates the baseline and asserts locked population/group counts. The importer treats its source as read-only. SCIM writes modify a persisted runtime copy; they do not rewrite the Git baseline. An authenticated reset restores the baseline and invalidates sessions/tokens while retaining application configuration.
 
 See [architecture and security](docs/architecture.md), [protocol capabilities](docs/protocols.md), and [deployment](docs/deployment.md) for endpoint contracts, key handling, concurrency, reset behavior, limits, and troubleshooting.
+
+## Archetypes and browser tests
+
+Select Real Estate, Biotech / Life Sciences, or Insurance in the sidebar. Each has 267 identities (238 employees and 29 embedded vendors) and an independent directory and configuration. Real Estate retains its locked 185 groups; the other two have 213 groups each. See [organization and group design](docs/archetypes.md).
+
+Configuration → OIDC links to a browser Authorization Code + PKCE test that verifies the ID token and UserInfo. Configuration → SAML links to a signed response test. Both work with the selected archetype. Sign-in branding follows its configured employee domain, with archetype-specific colors and symbols.

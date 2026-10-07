@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { ProtocolSettings } from "../components/ProtocolSettings";
-import baseline from "../data/summit-ridge.json";
+import { seeds, archetypes, type ArchetypeId } from "../lib/archetypes";
 type RecordData = Record<string, any>;
 const sections = ["Overview", "Directory", "Configuration", "Activity"];
 const configurationTabs = [
@@ -14,6 +14,9 @@ const configurationTabs = [
   "Advanced",
 ];
 export default function Home() {
+  const [tenant, setTenant] = useState<ArchetypeId>("realestate");
+  const baseline = seeds[tenant],
+    archetype = archetypes[tenant];
   const [section, setSection] = useState("Overview"),
     [overviewTab, setOverviewTab] = useState("Summary"),
     [directoryTab, setDirectoryTab] = useState("Users"),
@@ -34,14 +37,17 @@ export default function Home() {
   const users = directory?.users || baseline.users,
     groups = directory?.groups || baseline.groups;
   async function request(url: string, options: RequestInit = {}) {
-    const r = await fetch(url, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        ...options.headers,
+    const r = await fetch(
+      url + (url.includes("?") ? "&" : "?") + "tenant=" + tenant,
+      {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          ...options.headers,
+        },
       },
-    });
+    );
     const text = await r.text();
     let b;
     try {
@@ -71,6 +77,29 @@ export default function Home() {
     setConnected(true);
     return c;
   }
+  useEffect(() => {
+    setDirectory(null);
+    setConfig("");
+    setDeployment(null);
+    setSelected(null);
+    setOrg("All organizations");
+    setQuery("");
+    setEmployeeDomain(
+      tenant === "realestate" ? "summitridge.example" : tenant + ".example",
+    );
+    setContractorDomain(
+      tenant === "realestate"
+        ? "summitridge.example"
+        : "partners." + tenant + ".example",
+    );
+    setConnected(false);
+    if (token) {
+      setBusy(true);
+      loadState()
+        .catch((e) => setMessage(e.message))
+        .finally(() => setBusy(false));
+    }
+  }, [tenant]);
   async function connect() {
     setBusy(true);
     try {
@@ -195,10 +224,23 @@ export default function Home() {
           </span>
         </a>
         <div className="tenant">
-          <span className="avatar">RE</span>
+          <span className="avatar">{archetype.initials}</span>
           <div>
-            <strong>Real Estate</strong>
-            <small>Enterprise archetype</small>
+            <strong>{archetype.name}</strong>
+            <label>
+              <select
+                aria-label="Enterprise archetype"
+                value={tenant}
+                disabled={busy}
+                onChange={(e) => setTenant(e.target.value as ArchetypeId)}
+              >
+                {Object.entries(archetypes).map(([id, a]) => (
+                  <option key={id} value={id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           <span className="dot" />
         </div>
@@ -221,12 +263,25 @@ export default function Home() {
           <small>
             Enterprise identity simulator
             <br />
-            Real Estate archetype · v1
+            {archetype.name} archetype · v1
           </small>
         </div>
       </aside>
       <main>
         <header>
+          <select
+            className="mobile-archetype"
+            aria-label="Enterprise archetype"
+            value={tenant}
+            disabled={busy}
+            onChange={(e) => setTenant(e.target.value as ArchetypeId)}
+          >
+            {Object.entries(archetypes).map(([id, a]) => (
+              <option key={id} value={id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
           <span>
             Workspace <b>/</b> {section}
           </span>
@@ -237,7 +292,7 @@ export default function Home() {
         <div className="content">
           <div className="heading">
             <div>
-              <div className="eyebrow">REAL ESTATE</div>
+              <div className="eyebrow">{archetype.name.toUpperCase()}</div>
               <h1>
                 {section === "Overview"
                   ? "Your enterprise, connected."
@@ -374,13 +429,9 @@ export default function Home() {
                   [
                     users.length,
                     "Total identities",
-                    "Across a complete real estate enterprise",
+                    "Across a complete " + archetype.name + " enterprise",
                   ],
-                  [
-                    counts.employees,
-                    "Employees",
-                    "Investment, development & operations",
-                  ],
+                  [counts.employees, "Employees", "Across the organization"],
                   [
                     counts.vendors,
                     "Embedded vendors",
@@ -410,19 +461,14 @@ export default function Home() {
                       View organization →
                     </button>
                   </div>
-                  <p>
-                    From the first investment thesis to the day-to-day operation
-                    of a property.
-                  </p>
+                  <p>{archetype.description}</p>
                   <div className="chain">
-                    {["Invest", "Develop", "Build", "Lease", "Operate"].map(
-                      (s, i) => (
-                        <div key={s}>
-                          <span>0{i + 1}</span>
-                          <strong>{s}</strong>
-                        </div>
-                      ),
-                    )}
+                    {archetype.stages.map((s, i) => (
+                      <div key={s}>
+                        <span>0{i + 1}</span>
+                        <strong>{s}</strong>
+                      </div>
+                    ))}
                   </div>
                   <div className="orglist">
                     {baseline.organizations.map((o) => (
@@ -432,7 +478,7 @@ export default function Home() {
                         <div className="bar">
                           <i
                             style={{
-                              width: `${((o.employees + o.vendors) / 45) * 100}%`,
+                              width: `${((o.employees + o.vendors) / Math.max(...baseline.organizations.map((o) => o.employees + o.vendors))) * 100}%`,
                             }}
                           />
                         </div>
@@ -818,6 +864,7 @@ export default function Home() {
               configurationTab,
             ) && (
               <ProtocolSettings
+                tenant={tenant}
                 protocol={configurationTab}
                 config={
                   config
@@ -862,8 +909,8 @@ export default function Home() {
           <footer>
             AuthNAuthZ{" "}
             <span>
-              Real Estate archetype · Private Blob persistence · Configurable
-              enterprise protocols
+              {archetype.name} archetype · Private Blob persistence ·
+              Configurable enterprise protocols
             </span>
             {connected && (
               <button

@@ -1,4 +1,5 @@
 "use client";
+import { archetypes, type ArchetypeId } from "../lib/archetypes";
 import { useState, useEffect } from "react";
 type Data = Record<string, any>;
 const paths: Record<string, [string, string][]> = {
@@ -68,12 +69,14 @@ const fields: Record<string, [string, string, string][]> = {
   ],
 };
 export function ProtocolSettings({
+  tenant,
   protocol,
   config,
   connected,
   deployment,
   onSave,
 }: {
+  tenant: ArchetypeId;
   protocol: string;
   config: Data;
   connected: boolean;
@@ -265,7 +268,7 @@ export function ProtocolSettings({
                   : "Import the metadata URL into your relying party to obtain the issuer, endpoints, and signing certificate."}
             </p>
             {(paths[protocol] || []).map(([label, path]) => {
-              const url = base + "/api/t/realestate" + path;
+              const url = base + "/api/t/" + tenant + path;
               return (
                 <div className="endpoint" key={label}>
                   <strong>{label}</strong>
@@ -290,24 +293,45 @@ export function ProtocolSettings({
               );
             })}
           </section>
+          {protocol === "OIDC" && (
+            <section className="card">
+              <h2>Test OIDC / OAuth sign-in</h2>
+              <p>
+                Run Authorization Code with PKCE. The test validates the ID
+                token signature, issuer, audience and nonce, and checks
+                UserInfo.
+              </p>
+              <div className="endpoint">
+                <strong>{archetypes[tenant].name} OIDC / OAuth test</strong>
+                <code>{base + "/api/oidc-test?tenant=" + tenant}</code>
+                <a
+                  href={base + "/api/oidc-test?tenant=" + tenant}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Start test ↗
+                </a>
+              </div>
+            </section>
+          )}
           {protocol === "SAML" && (
             <section className="card">
               <h2>Test SAML sign-in</h2>
               <p>
-                Start a Real Estate sign-in with a fresh authentication request.
-                Use a directory username and the shared simulator password. The
-                test page verifies the signed response and displays the returned
-                identity attributes.
+                Start a {archetypes[tenant].name} sign-in with a fresh
+                authentication request. Use a directory username and the shared
+                simulator password. The test page verifies the signed response
+                and displays the returned identity attributes.
               </p>
               <div className="endpoint">
-                <strong>Real Estate SAML SSO test</strong>
-                <code>{base + "/api/saml-test"}</code>
+                <strong>{archetypes[tenant].name} SAML SSO test</strong>
+                <code>{base + "/api/saml-test?tenant=" + tenant}</code>
                 <button
                   className="secondary"
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(
-                        base + "/api/saml-test",
+                        base + "/api/saml-test?tenant=" + tenant,
                       );
                       setMessage("SAML test URL copied.");
                     } catch {
@@ -318,7 +342,7 @@ export function ProtocolSettings({
                   Copy
                 </button>
                 <a
-                  href={base + "/api/saml-test"}
+                  href={base + "/api/saml-test?tenant=" + tenant}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -445,13 +469,24 @@ export function ProtocolSettings({
                       >
                         <option value={-1}>New application</option>
                         {entries.map((c, i) => (
-                          <option value={i} key={i}>
+                          <option
+                            value={i}
+                            key={i}
+                            disabled={
+                              (c.client_id || c.id) ===
+                              tenant + "-" + protocol.toLowerCase() + "-test"
+                            }
+                          >
                             {c.name || c.client_id || c.id}
                           </option>
                         ))}
                       </select>
                       <span>{entries.length} registered</span>
                     </div>
+                    <p>
+                      Built-in test registrations are managed automatically.
+                      Create a separate registration for your own application.
+                    </p>
                     <form className="domain-form" onSubmit={save}>
                       {(fields[protocol] || []).map(([name, label, type]) => (
                         <label key={name}>

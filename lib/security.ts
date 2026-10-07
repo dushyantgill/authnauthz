@@ -1,3 +1,4 @@
+import { archetypeId } from "./archetypes";
 import {
   createHmac,
   randomBytes,
@@ -51,7 +52,7 @@ export function cookieUser(req: NextApiRequest) {
   if (!sig || !equal(mac(b), sig)) return null;
   try {
     const v = JSON.parse(Buffer.from(b, "base64url").toString());
-    if (v.exp < Date.now() || v.tenant !== "realestate") return null;
+    if (v.exp < Date.now() || !archetypeId(v.tenant)) return null;
     return v as {
       id: string;
       tenant: string;
@@ -80,9 +81,13 @@ export async function revokeSessions(t: string, id: string) {
       if (e.payload.accountId === id || e.payload.id === id) delete s.models[k];
   });
 }
-export async function setSession(res: NextApiResponse, id: string) {
+export async function setSession(
+  res: NextApiResponse,
+  id: string,
+  tenant = "realestate",
+) {
   const sid = randomBytes(24).toString("hex");
-  await store().mutate("realestate", (s) => {
+  await store().mutate(tenant, (s) => {
     s.models["BrowserSession:" + sid] = {
       payload: { accountId: id },
       expires: Date.now() + 3600000,
@@ -92,7 +97,7 @@ export async function setSession(res: NextApiResponse, id: string) {
     JSON.stringify({
       id,
       sid,
-      tenant: "realestate",
+      tenant,
       exp: Date.now() + 3600000,
       authTime: Math.floor(Date.now() / 1000),
     }),

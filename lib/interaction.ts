@@ -1,3 +1,4 @@
+import { loginBrand } from "./login-brand";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { provider } from "./oidc";
 import { body } from "./http";
@@ -25,6 +26,8 @@ export async function interaction(
   const { prompt, params, session } = details;
   if (req.method === "GET") {
     const token = await csrf(t, uid);
+    const brand = loginBrand(t, await store().read(t));
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader(
       "Content-Security-Policy",
       "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; form-action 'self'; frame-ancestors 'none'",
@@ -32,7 +35,7 @@ export async function interaction(
     return res
       .status(200)
       .send(
-        `<!doctype html><html><head><title>Real Estate sign in</title><style>@font-face{font-family:Plex;src:url(/fonts/ibm-plex-sans-regular.woff2) format("woff2");font-display:swap}body{font:16px Plex,system-ui;background:#f2f5f4;margin:6% auto;max-width:540px}main{background:white;padding:36px;border-radius:16px}input,select,button{display:block;box-sizing:border-box;width:100%;padding:12px;margin:14px 0}button{background:#a3e635;color:#19231e;border:0}</style></head><body><main><h1>${prompt.name === "login" ? "Sign in" : "Approve access"}</h1><p>Real Estate · Identity simulator</p><p>Application: ${escape(params.client_id)}</p><p>Requested scopes: ${escape(params.scope)}</p><form method="post" action="${escape(origin())}/api/t/${t}/interaction/${escape(uid)}"><input type="hidden" name="csrf" value="${token}">${prompt.name === "login" ? `<label>Username<input name="username" type="email" autocomplete="username" required placeholder="name@your-domain.com"></label><label>Simulation password<input name="password" type="password" required autocomplete="current-password"></label>` : ""}<button name="action" value="approve">${prompt.name === "login" ? "Sign in" : "Approve"}</button><button name="action" value="deny">Cancel</button></form></main></body></html>`,
+        `<!doctype html><html><head><title>${brand.title} sign in</title><style>@font-face{font-family:Plex;src:url(/fonts/ibm-plex-sans-regular.woff2) format("woff2");font-display:swap}body{font:16px Plex,system-ui;background:#f2f5f4;margin:6% auto;max-width:540px}main{background:white;padding:36px;border-radius:16px}input,select,button{display:block;box-sizing:border-box;width:100%;padding:12px;margin:14px 0}button{background:#a3e635;color:#19231e;border:0}${brand.style}</style></head><body><main>${brand.header}<h1>${prompt.name === "login" ? "Sign in" : "Approve access"}</h1><p>Application: ${escape(params.client_id)}</p><p>Requested scopes: ${escape(params.scope)}</p><form method="post" action="${escape(origin())}/api/t/${t}/interaction/${escape(uid)}"><input type="hidden" name="csrf" value="${token}">${prompt.name === "login" ? `<label>Username<input name="username" type="email" autocomplete="username" required placeholder="name@your-domain.com"></label><label>Simulation password<input name="password" type="password" required autocomplete="current-password"></label>` : ""}<button name="action" value="approve">${prompt.name === "login" ? "Sign in" : "Approve"}</button><button name="action" value="deny">Cancel</button></form></main></body></html>`,
       );
   }
   if (req.method !== "POST") return res.status(405).end();
@@ -57,7 +60,7 @@ export async function interaction(
       return res
         .status(401)
         .send("Invalid credentials. Return to the sign-in form and retry.");
-    await setSession(res, accountId);
+    await setSession(res, accountId, t);
     await store().audit(t, "login", accountId);
     return p.interactionFinished(
       req,

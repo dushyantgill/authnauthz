@@ -73,7 +73,14 @@ export async function provider(t: string) {
     adapter: adapter(t),
     clients: state.config.clients,
     jwks: JSON.parse(required("OIDC_JWKS")),
-    cookies: { keys: required("COOKIE_SECRET").split(",") },
+    cookies: {
+      keys: required("COOKIE_SECRET").split(","),
+      names: {
+        session: "_session_" + t,
+        interaction: "_interaction_" + t,
+        resume: "_resume_" + t,
+      },
+    },
     features: {
       devInteractions: { enabled: false },
       introspection: { enabled: true },
