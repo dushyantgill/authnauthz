@@ -630,7 +630,7 @@ export async function federation(
       if (session && v.root.getAttribute("ForceAuthn") !== "true")
         return await finish(t, payload, session.id, session.authTime, res);
       const uid = await pending(t, payload);
-      return res.redirect(`/api/t/${t}/saml/login?uid=${uid}`);
+      return res.redirect(303, `/api/t/${t}/saml/login?uid=${uid}`);
     }
     if (protocol === "wsfed" && !action) {
       if (req.method !== "GET") return res.status(405).end();

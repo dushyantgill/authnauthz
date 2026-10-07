@@ -387,7 +387,7 @@ it("rejects invalid SAML requests, XML entities, replay and unregistered WS-Fed 
   expect((await admin("config", "PUT", old)).status).toBe(200);
   const request = sp.createLoginRequest(idp, "redirect", { relayState: "abc" });
   let r = await http(String(request.context));
-  expect([302, 307]).toContain(r.status);
+  expect([302, 303, 307]).toContain(r.status);
   const formUrl = new URL(r.headers.get("location")!, base).href;
   const login = await (await http(formUrl, {}, true)).text();
   const csrf = login.match(/name="csrf" value="([^"]+)"/)?.[1],
@@ -569,7 +569,7 @@ it("runs the reusable SAML test through login and verified ACS, then rejects rep
     },
     true,
   );
-  expect([302, 307], await start.clone().text()).toContain(start.status);
+  expect(start.status, await start.clone().text()).toBe(303);
   const loginUrl = new URL(start.headers.get("location")!, base).href;
   const form = await (await http(loginUrl, {}, true)).text();
   const csrf = form.match(/name="csrf" value="([^"]+)"/)![1];
