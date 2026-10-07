@@ -28,6 +28,7 @@ export default async function handler(
   res: NextApiResponse,
 ) {
   headers(res);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader(
     "Content-Security-Policy",
     "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; form-action 'self'; frame-ancestors 'none'",

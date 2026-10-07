@@ -219,6 +219,7 @@ export function postForm(
   url: string,
   fields: Record<string, string>,
 ) {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
   const nonce = randomBytes(18).toString("base64");
   res.setHeader(
     "Content-Security-Policy",
@@ -539,6 +540,7 @@ export async function federation(
       if (!entry || entry.expires < Date.now())
         return res.status(400).send("Expired sign-in request");
       if (req.method === "GET") {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
         const token = await csrf(t, uid);
         res.setHeader(
           "Content-Security-Policy",

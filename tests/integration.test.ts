@@ -554,6 +554,7 @@ it("runs the reusable SAML test through login and verified ACS, then rejects rep
   });
   expect((await admin("config", "PUT", c)).status).toBe(200);
   const launch = await http("/api/saml-test", {}, true);
+  expect(launch.headers.get("content-type")).toContain("text/html");
   const page = await launch.text();
   expect(launch.status, page).toBe(200);
   const request = page.match(/name="SAMLRequest" value="([^"]+)"/)![1];
@@ -571,7 +572,9 @@ it("runs the reusable SAML test through login and verified ACS, then rejects rep
   );
   expect(start.status, await start.clone().text()).toBe(303);
   const loginUrl = new URL(start.headers.get("location")!, base).href;
-  const form = await (await http(loginUrl, {}, true)).text();
+  const loginPage = await http(loginUrl, {}, true);
+  expect(loginPage.headers.get("content-type")).toContain("text/html");
+  const form = await loginPage.text();
   const csrf = form.match(/name="csrf" value="([^"]+)"/)![1];
   const username = (await (await admin("directory")).json()).users[0].userName;
   const result = await http(
@@ -586,6 +589,7 @@ it("runs the reusable SAML test through login and verified ACS, then rejects rep
     },
     true,
   );
+  expect(result.headers.get("content-type")).toContain("text/html");
   const html = await result.text();
   expect(result.status, html).toBe(200);
   const encoded = html.match(/name="SAMLResponse" value="([^"]+)"/)![1];
@@ -598,6 +602,7 @@ it("runs the reusable SAML test through login and verified ACS, then rejects rep
     },
     true,
   );
+  expect(response.headers.get("content-type")).toContain("text/html");
   const verified = await response.text();
   expect(response.status, verified).toBe(200);
   expect(verified).toContain("SAML SSO succeeded");
