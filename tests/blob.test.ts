@@ -2,17 +2,31 @@ import { beforeEach, it, expect, vi } from "vitest";
 const blob = vi.hoisted(() => ({
   files: new Map<string, { text: string; etag: string }>(),
   get: vi.fn(),
+  head: vi.fn(),
   put: vi.fn(),
 }));
 vi.mock("@vercel/blob", () => {
   class BlobPreconditionFailedError extends Error {}
-  return { BlobPreconditionFailedError, get: blob.get, put: blob.put };
+  class BlobNotFoundError extends Error {}
+  return {
+    BlobPreconditionFailedError,
+    BlobNotFoundError,
+    get: blob.get,
+    head: blob.head,
+    put: blob.put,
+  };
 });
 import { BlobBackend, Store } from "../lib/store";
-import { BlobPreconditionFailedError } from "@vercel/blob";
+import { BlobPreconditionFailedError, BlobNotFoundError } from "@vercel/blob";
 beforeEach(() => {
   blob.files.clear();
   blob.get.mockReset();
+  blob.head.mockReset();
+  blob.head.mockImplementation(async (path: string) => {
+    const file = blob.files.get(path);
+    if (!file) throw new BlobNotFoundError();
+    return { etag: file.etag };
+  });
   blob.put.mockReset();
   blob.get.mockImplementation(async (path: string, options: any) => {
     expect(options).toMatchObject({ access: "private", useCache: false });
@@ -95,4 +109,19 @@ it("allows exactly one concurrent replay reservation through the Blob backend", 
     s.once("realestate", "same-id", 30),
   ]);
   expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+});
+
+it("uses stable object ETags for writes when delivery ETags differ", async () => {
+  const s = new Store(new BlobBackend());
+  await s.mutate("realestate", () => {});
+  const original = blob.get.getMockImplementation()!;
+  blob.get.mockImplementation(async (...args: any[]) => {
+    const b = await original(...args);
+    if (b) b.blob.etag = 'W/"delivery-tag"';
+    return b;
+  });
+  await s.mutate("realestate", (state) => {
+    state.config.persona = "entra";
+  });
+  expect((await s.read("realestate")).config.persona).toBe("entra");
 });

@@ -542,3 +542,77 @@ it("persists domains, retains stable IDs, rejects cross-origin changes, and stor
     "@officelore.example",
   );
 });
+it("runs the reusable SAML test through login and verified ACS, then rejects replay", async () => {
+  const { testMetadata } = await import("../lib/saml-test");
+  const c = await (await admin("config")).json();
+  c.samlApps.push({
+    id: "realestate-saml-test",
+    name: "Real Estate SAML Test",
+    metadata: testMetadata(),
+    requireSignedRequests: false,
+    encryptAssertions: false,
+  });
+  expect((await admin("config", "PUT", c)).status).toBe(200);
+  const launch = await http("/api/saml-test", {}, true);
+  const page = await launch.text();
+  expect(launch.status, page).toBe(200);
+  const request = page.match(/name="SAMLRequest" value="([^"]+)"/)![1];
+  const start = await http(
+    "/api/t/realestate/saml/sso",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        SAMLRequest: request,
+        RelayState: "realestate-saml-test",
+      }),
+    },
+    true,
+  );
+  expect([302, 307], await start.clone().text()).toContain(start.status);
+  const loginUrl = new URL(start.headers.get("location")!, base).href;
+  const form = await (await http(loginUrl, {}, true)).text();
+  const csrf = form.match(/name="csrf" value="([^"]+)"/)![1];
+  const username = (await (await admin("directory")).json()).users[0].userName;
+  const result = await http(
+    loginUrl,
+    {
+      method: "POST",
+      headers: {
+        Origin: base,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ csrf, username, password: "Test@User1" }),
+    },
+    true,
+  );
+  const html = await result.text();
+  expect(result.status, html).toBe(200);
+  const encoded = html.match(/name="SAMLResponse" value="([^"]+)"/)![1];
+  const response = await http(
+    "/api/saml-test",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ SAMLResponse: encoded }),
+    },
+    true,
+  );
+  const verified = await response.text();
+  expect(response.status, verified).toBe(200);
+  expect(verified).toContain("SAML SSO succeeded");
+  expect(verified).toContain(username);
+  expect(
+    (
+      await http(
+        "/api/saml-test",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ SAMLResponse: encoded }),
+        },
+        true,
+      )
+    ).status,
+  ).toBe(400);
+});

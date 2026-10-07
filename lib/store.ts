@@ -1,4 +1,10 @@
-import { get, put, BlobPreconditionFailedError } from "@vercel/blob";
+import {
+  get,
+  head,
+  put,
+  BlobPreconditionFailedError,
+  BlobNotFoundError,
+} from "@vercel/blob";
 import {
   createCipheriv,
   createDecipheriv,
@@ -102,14 +108,26 @@ function open(s: string): State {
 }
 export class BlobBackend implements Backend {
   async read(path: string) {
-    const b = await get(path, { access: "private", useCache: false });
-    if (!b || b.statusCode !== 200) return null;
-    if (!b.blob.etag)
-      throw Error("Blob origin response lacks a concurrency ETag");
-    return {
-      state: open(await new Response(b.stream).text()),
-      etag: b.blob.etag,
-    };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let before;
+      try {
+        before = await head(path);
+      } catch (e) {
+        // Only a confirmed not-found is an empty store; credentials and network errors fail closed.
+        if (e instanceof BlobNotFoundError) return null;
+        throw e;
+      }
+      if (!before.etag) throw Error("Blob metadata lacks a concurrency ETag");
+      const b = await get(path, { access: "private", useCache: false });
+      if (!b || b.statusCode !== 200) continue;
+      const state = open(await new Response(b.stream).text());
+      if (b.blob.etag === before.etag) return { state, etag: before.etag };
+      // Delivery ETags can differ from the object ETag used by conditional writes.
+      // Bracket the uncached body read with stable object metadata to avoid pairing old data with a new write version.
+      const after = await head(path);
+      if (before.etag === after.etag) return { state, etag: after.etag };
+    }
+    throw new Conflict("Blob changed during read; retry the request");
   }
   async write(path: string, state: State, etag?: string) {
     try {
