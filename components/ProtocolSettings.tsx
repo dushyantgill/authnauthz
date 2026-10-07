@@ -290,6 +290,43 @@ export function ProtocolSettings({
               );
             })}
           </section>
+          {protocol === "SAML" && (
+            <section className="card">
+              <h2>Test SAML sign-in</h2>
+              <p>
+                Start a Real Estate sign-in with a fresh authentication request.
+                Use a directory username and the shared simulator password. The
+                test page verifies the signed response and displays the returned
+                identity attributes.
+              </p>
+              <div className="endpoint">
+                <strong>Real Estate SAML SSO test</strong>
+                <code>{base + "/api/saml-test"}</code>
+                <button
+                  className="secondary"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        base + "/api/saml-test",
+                      );
+                      setMessage("SAML test URL copied.");
+                    } catch {
+                      setMessage("Copy the test URL text manually.");
+                    }
+                  }}
+                >
+                  Copy
+                </button>
+                <a
+                  href={base + "/api/saml-test"}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Start test ↗
+                </a>
+              </div>
+            </section>
+          )}
           {protocol === "SCIM" ? (
             <section className="card">
               <h2>Provisioning configuration</h2>
