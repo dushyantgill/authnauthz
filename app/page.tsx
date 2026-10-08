@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
+import { ArchetypePicker } from "../components/ArchetypePicker";
+import { ProfileAvatar } from "../components/ProfileAvatar";
 import { ProtocolSettings } from "../components/ProtocolSettings";
 import { seeds, archetypes, type ArchetypeId } from "../lib/archetypes";
 type RecordData = Record<string, any>;
@@ -224,25 +226,11 @@ export default function Home() {
           </span>
         </a>
         <div className="tenant">
-          <span className="avatar">{archetype.initials}</span>
-          <div>
-            <strong>{archetype.name}</strong>
-            <label>
-              <select
-                aria-label="Enterprise archetype"
-                value={tenant}
-                disabled={busy}
-                onChange={(e) => setTenant(e.target.value as ArchetypeId)}
-              >
-                {Object.entries(archetypes).map(([id, a]) => (
-                  <option key={id} value={id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <span className="dot" />
+          <ArchetypePicker
+            value={tenant}
+            disabled={busy}
+            onChange={setTenant}
+          />
         </div>
         <div className="navlabel">IDENTITY WORKSPACE</div>
         <nav>
@@ -269,19 +257,14 @@ export default function Home() {
       </aside>
       <main>
         <header>
-          <select
-            className="mobile-archetype"
-            aria-label="Enterprise archetype"
-            value={tenant}
-            disabled={busy}
-            onChange={(e) => setTenant(e.target.value as ArchetypeId)}
-          >
-            {Object.entries(archetypes).map(([id, a]) => (
-              <option key={id} value={id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+          <div className="mobile-archetype">
+            <ArchetypePicker
+              compact
+              value={tenant}
+              disabled={busy}
+              onChange={setTenant}
+            />
+          </div>
           <span>
             Workspace <b>/</b> {section}
           </span>
@@ -579,13 +562,7 @@ export default function Home() {
                       >
                         <td>
                           <div className="person">
-                            <span className="avatar">
-                              {u.displayName
-                                .split(" ")
-                                .map((s: string) => s[0])
-                                .slice(0, 2)
-                                .join("")}
-                            </span>
+                            <ProfileAvatar user={u} />
                             <div>
                               <strong>{u.displayName}</strong>
                               <small>{u.userName}</small>
@@ -685,6 +662,7 @@ export default function Home() {
                         );
                         return (
                           <button key={u.id} onClick={() => setSelected(u)}>
+                            <ProfileAvatar user={u} />
                             <strong>{u.displayName}</strong>
                             <span>{u.title}</span>
                             <small>
@@ -940,7 +918,10 @@ export default function Home() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="cardheading">
-              <h2>{selected.displayName}</h2>
+              <div className="person">
+                {selected.userName && <ProfileAvatar user={selected} large />}
+                <h2>{selected.displayName}</h2>
+              </div>
               <button className="secondary" onClick={() => setSelected(null)}>
                 Close
               </button>

@@ -839,3 +839,149 @@ button:not(.secondary):not(.textbutton):not(.protocolrow):not(.group):hover {
     font-size: 12px;
   }
 }
+
+.tenant {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.archetype-picker {
+  position: relative;
+  width: 100%;
+}
+.archetype-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 10px;
+  text-align: left;
+  border: 1px solid #42513d;
+  background: #253227;
+  color: #f5f8f1;
+  border-radius: 12px;
+}
+.archetype-trigger:hover {
+  background: #30412f !important;
+}
+.archetype-symbol {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  height: 36px;
+  border-radius: 8px;
+  background: #35472b;
+  color: var(--accent);
+  font-size: 24px;
+}
+.archetype-label {
+  flex: 1;
+  min-width: 0;
+}
+.archetype-label small {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: #c0ceba;
+  margin-bottom: 3px;
+}
+.archetype-label strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.picker-chevron {
+  font-size: 18px;
+  transition: transform 0.15s;
+}
+.picker-chevron.open {
+  transform: rotate(180deg);
+}
+.archetype-menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 310px;
+  max-width: calc(100vw - 100px);
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 16px 40px #101b1a30;
+}
+.picker-caption {
+  padding: 8px 10px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.picker-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px;
+  text-align: left;
+  background: white;
+  color: var(--ink);
+  border-radius: 9px;
+}
+.picker-option:hover,
+.picker-option:focus-visible {
+  background: #f0f5eb !important;
+}
+.picker-option.selected {
+  background: #eef8df;
+}
+.picker-option strong {
+  display: block;
+  font-size: 13px;
+}
+.picker-option small {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.option-symbol {
+  flex: 0 0 28px;
+  font-size: 23px;
+  color: var(--green);
+}
+.picker-check {
+  margin-left: auto;
+  color: #426916;
+}
+.archetype-picker.compact .archetype-trigger {
+  color: var(--ink);
+  background: white;
+  padding: 6px;
+  border-color: var(--line);
+}
+.archetype-picker.compact .archetype-trigger:hover {
+  background: #f0f5eb !important;
+}
+.archetype-picker.compact .archetype-label small {
+  color: var(--muted);
+}
+.archetype-picker.compact .archetype-symbol {
+  display: none;
+}
+.profile-avatar {
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.profile-avatar.large {
+  width: 64px;
+  height: 64px;
+  font-size: 20px;
+}

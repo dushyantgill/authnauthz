@@ -35,3 +35,9 @@ Secret/key material is generated locally and excluded from Git. Environment valu
 No external security audit, customer-vendor compatibility certification, real Blob deployment test or Vercel deployment is implied by passing the local suite. Test the supplied profile with each actual relying party. A particular enterprise app may require an optional feature not enabled here; consult the capability matrix rather than interpreting “SAML/OIDC/SCIM/WS-Fed support” as every possible standards extension.
 
 Use dedicated synthetic test applications and credentials. Rotate tokens/keys deliberately and back up state/encryption keys. Keep preview/prod stores separate. Provisioning tests can modify runtime identities, but reset always restores the immutable archetype. Blob unavailability, quota exhaustion and repeated contention produce errors; they do not silently weaken replay protection or move to memory.
+
+## Directory presentation upgrades
+
+The CSV contains 267 JPEG thumbnails. Currently 81 are published as static profile assets; 186 remain extracted locally and await an efficient authenticated Git transfer. `public/photos/status.json` records this partial publication. Each seed and live SCIM User references its thumbnail with the standard `photos` attribute; all three archetypes share the supplied synthetic portraits. Custom SCIM photo values are retained, and failed images fall back to initials. The supplied photos are public assets, published with user approval.
+
+Existing Real Estate `MGR-<manager UUID>` labels migrate to `TEAM-<MANAGER-NAME>-DIRECT-REPORTS`, while group UUIDs, membership, workforce counts, configured domains and registrations remain unchanged. Migration persists through the Blob conditional-write path and updates resource metadata. Deliberately renamed groups are retained. The immutable Real Estate population remains 267 identities and 185 groups.

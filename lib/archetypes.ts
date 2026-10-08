@@ -1,4 +1,25 @@
-import realestate from "../data/summit-ridge.json";
+import source from "../data/summit-ridge.json";
+const realestate = {
+  ...source,
+  users: source.users.map((u) => ({
+    ...u,
+    photo: "/photos/" + u.userName.split("@")[0] + ".jpg",
+  })),
+  groups: source.groups.map((g) => {
+    const manager = g.displayName.startsWith("MGR-")
+      ? source.users.find((u) => u.id === g.displayName.slice(4))
+      : undefined;
+    return manager
+      ? {
+          ...g,
+          displayName:
+            "TEAM-" +
+            manager.displayName.toUpperCase().replace(/[^A-Z0-9]+/g, "-") +
+            "-DIRECT-REPORTS",
+        }
+      : g;
+  }),
+};
 export const archetypes = {
   realestate: {
     name: "Real Estate",

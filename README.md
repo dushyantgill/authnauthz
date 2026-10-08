@@ -43,7 +43,7 @@ After configuring a real private Blob store, run `npm run test:blob` for a live 
 
 ## Directory provenance and operation
 
-`data/summit-ridge.json` is the versioned baseline. Its identities come from the uploaded `SampleAADUserData.csv`, with employee/vendor classification preserved and stable UUIDs derived from the source aliases. Organization and role assignments reconstruct the agreed real estate design. Names, aliases, locations, countries, and telephone values are retained; source passwords, force-change flags, and images are excluded. The source file's SHA-256 is recorded for provenance. The uploaded raw CSV is not committed because it contains password fields.
+`data/summit-ridge.json` is the versioned baseline. Its identities come from the uploaded `SampleAADUserData.csv`, with employee/vendor classification preserved and stable UUIDs derived from the source aliases. Organization and role assignments reconstruct the agreed real estate design. Names, aliases, locations, countries, and telephone values are retained; source passwords and force-change flags are excluded. Original JPEG thumbnails are extracted to `public/photos` and served through SCIM photo URLs in all three archetypes. The source file's SHA-256 is recorded for provenance. The uploaded raw CSV is not committed because it contains password fields.
 
 `python3 scripts/import-directory.py /path/to/SampleAADUserData.csv` deterministically recreates the baseline and asserts locked population/group counts. The importer treats its source as read-only. SCIM writes modify a persisted runtime copy; they do not rewrite the Git baseline. An authenticated reset restores the baseline and invalidates sessions/tokens while retaining application configuration.
 
@@ -54,3 +54,5 @@ See [architecture and security](docs/architecture.md), [protocol capabilities](d
 Select Real Estate, Biotech / Life Sciences, or Insurance in the sidebar. Each has 267 identities (238 employees and 29 embedded vendors) and an independent directory and configuration. Real Estate retains its locked 185 groups; the other two have 213 groups each. See [organization and group design](docs/archetypes.md).
 
 Configuration → OIDC links to a browser Authorization Code + PKCE test that verifies the ID token and UserInfo. Configuration → SAML links to a signed response test. Both work with the selected archetype. Sign-in branding follows its configured employee domain, with archetype-specific colors and symbols.
+
+`python3 scripts/extract-photos.py /path/to/SampleAADUserData.csv` restores the original thumbnails without editing the CSV or embedding passwords. Manager groups use readable display names; existing group IDs and memberships stay stable.

@@ -54,6 +54,7 @@ export function initial(t = "realestate"): State {
         userType: u.userType,
         title: u.title,
         emails: [{ value: u.userName, type: "work", primary: true }],
+        photos: [{ value: u.photo, type: "thumbnail", primary: true }],
         addresses: [{ locality: u.location, country: u.country, type: "work" }],
         phoneNumbers: [{ value: u.phone, type: "work" }],
         "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
@@ -84,6 +85,41 @@ export function initial(t = "realestate"): State {
     models: {},
     events: [],
   };
+}
+function refreshDirectoryPresentation(s: State, t: string) {
+  let changed = false;
+  const baseline = seeds[tenantId(t)],
+    users = new Map(baseline.users.map((u) => [u.id, u]));
+  function mark(resource: Resource) {
+    resource.meta = {
+      ...resource.meta,
+      lastModified: new Date().toISOString(),
+      version: `W/"${s.version + 1}"`,
+    };
+    changed = true;
+  }
+  for (const u of s.resources.Users)
+    if (!Object.hasOwn(u, "photos") && users.has(u.id)) {
+      u.photos = [
+        { value: users.get(u.id)!.photo, type: "thumbnail", primary: true },
+      ];
+      mark(u);
+    }
+  if (t === "realestate")
+    for (const g of s.resources.Groups) {
+      if (!/^MGR-[0-9a-f-]{36}$/.test(g.displayName)) continue;
+      const manager = s.resources.Users.find(
+        (u) => u.id === g.displayName.slice(4),
+      );
+      if (manager) {
+        g.displayName =
+          "TEAM-" +
+          manager.displayName.toUpperCase().replace(/[^A-Z0-9]+/g, "-") +
+          "-DIRECT-REPORTS";
+        mark(g);
+      }
+    }
+  return changed;
 }
 export interface Backend {
   read(path: string): Promise<{ state: State; etag: string } | null>;
@@ -176,9 +212,14 @@ export class Store {
   path(t: string) {
     return `authnauthz/v1/${tenantId(t)}/state.enc.json`;
   }
-  async read(t: string) {
-    const s = (await this.backend.read(this.path(t)))?.state || initial(t);
+  async read(t: string): Promise<State> {
+    const existing = await this.backend.read(this.path(t));
+    const s = existing?.state || initial(t);
     s.config = withTestClients(s.config, t);
+    if (refreshDirectoryPresentation(s, t) && existing) {
+      await this.mutate(t, () => undefined);
+      return this.read(t);
+    }
     return s;
   }
   async mutate<T>(t: string, fn: (s: State) => T): Promise<T> {
@@ -186,6 +227,7 @@ export class Store {
       const old = await this.backend.read(this.path(t));
       const s = old?.state || initial(t);
       s.config = withTestClients(s.config, t);
+      refreshDirectoryPresentation(s, t);
       const now = Date.now();
       for (const [k, v] of Object.entries(s.models))
         if (v.expires < now) delete s.models[k];
